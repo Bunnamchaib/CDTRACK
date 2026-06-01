@@ -23,3 +23,9 @@
 - ปัญหา: ต้องย่อ requirement ใหญ่จาก full-stack เดิมให้เหลือเวอร์ชัน GAS ที่ยังใช้งานได้จริงในไฟล์หลักไม่กี่ไฟล์ และต้องระวัง logic คำนวณรายงาน/alert ให้ไม่เพี้ยน
 - แก้อย่างไร: รวม backend logic ไว้ใน `code.gs`, รวม UI/CSS/JS ไว้ใน `index.html`, ทำระบบ dashboard/cards/add transaction/reports/settings ในหน้าเดียว, และเช็ก syntax พื้นฐานของ `code.gs` กับ script ใน `index.html` แล้วผ่าน
 - ทำต่อ: รอบถัดไปให้เอาไฟล์ไปวางใน Apps Script, กดรัน `setupProject`, ทดสอบ Web App จริง, แล้วค่อยเก็บบั๊กหรือปรับ UI/flow เพิ่มตามการใช้งานจริง
+
+## 2026-06-01 11:13:03
+- ทำอะไรไป: ตั้ง git ในโฟลเดอร์ Main Project, ผูก remote ไปที่ `https://github.com/Bunnamchaib/CDTRACK.git`, commit ไฟล์หลัก `index.html`, `code.gs`, `appsscript.json`, `note.md`, และ push ขึ้น branch `main` เรียบร้อย
+- ปัญหา: โฟลเดอร์งานเดิมยังไม่ใช่ git repo และ remote ปลายทางเป็น empty repository จึงต้องตั้ง repo ใหม่ให้ระวัง scope ของไฟล์ที่จะ push
+- แก้อย่างไร: stage เฉพาะไฟล์งานส่งมอบหลัก ไม่เอา `Design`, `backup`, `prompt.txt` หรือไฟล์อื่นที่ไม่ใช่ตัว MVP ขึ้นไป, แล้ว push commit `84cb460`
+- ทำต่อ: ถัดไปให้เปิด repo บน GitHub หรือดึงไฟล์ไปลง Apps Script เพื่อทดสอบ `setupProject` และ Web App จริง จากนั้นค่อยแก้บั๊กและ push รอบต่อไป
