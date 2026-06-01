@@ -38,15 +38,16 @@ function getAppData() {
 
 function setupProject() {
   try {
-    const spreadsheet = ensureProjectSpreadsheet_();
-    initializeSheets_(spreadsheet);
-    ensureDemoData_(spreadsheet);
-
-    const payload = buildAppPayload_(spreadsheet);
-    syncAlertsSheet_(spreadsheet, payload.alerts);
-    payload.setupCompletedAt = new Date().toISOString();
-    payload.systemStatus = buildSystemStatus_(spreadsheet);
-    return payload;
+    const setupResult = runSetupCore_();
+    return {
+      ok: true,
+      projectName: PROJECT_NAME,
+      setupCompletedAt: new Date().toISOString(),
+      spreadsheetId: setupResult.spreadsheet.getId(),
+      spreadsheetUrl: setupResult.spreadsheet.getUrl(),
+      systemStatus: buildSystemStatus_(setupResult.spreadsheet),
+      steps: setupResult.steps,
+    };
   } catch (error) {
     throw new Error('setupProject failed: ' + (error && error.message ? error.message : error));
   }
@@ -69,7 +70,17 @@ function getSystemStatus() {
 }
 
 function runSetupAndCheck() {
-  return setupProject();
+  try {
+    const setupResult = runSetupCore_();
+    const payload = buildAppPayload_(setupResult.spreadsheet);
+    syncAlertsSheet_(setupResult.spreadsheet, payload.alerts);
+    payload.systemStatus = buildSystemStatus_(setupResult.spreadsheet);
+    payload.setupCompletedAt = new Date().toISOString();
+    payload.setupSteps = setupResult.steps;
+    return payload;
+  } catch (error) {
+    throw new Error('runSetupAndCheck failed: ' + (error && error.message ? error.message : error));
+  }
 }
 
 function saveCard(cardInput) {
@@ -193,27 +204,39 @@ function getRequiredSpreadsheet_() {
 }
 
 function initializeSheets_(spreadsheet) {
+  const report = [];
   Object.keys(SHEET_DEFINITIONS).forEach(function(sheetName) {
     const headers = SHEET_DEFINITIONS[sheetName];
     let sheet = spreadsheet.getSheetByName(sheetName);
+    let action = 'checked';
     if (!sheet) {
       sheet = spreadsheet.insertSheet(sheetName);
+      action = 'created';
     }
 
     if (sheet.getLastRow() === 0) {
       sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
       sheet.setFrozenRows(1);
+      action = action === 'created' ? 'created+headers' : 'headers-added';
     } else {
       const existingHeaders = sheet.getRange(1, 1, 1, headers.length).getValues()[0];
       if (existingHeaders.join('|') !== headers.join('|')) {
         sheet.clear();
         sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
         sheet.setFrozenRows(1);
+        action = 'headers-reset';
       }
     }
+
+    report.push({
+      sheetName: sheetName,
+      action: action,
+      rowCount: Math.max(sheet.getLastRow() - 1, 0),
+    });
   });
 
   removeEmptyDefaultSheet_(spreadsheet);
+  return report;
 }
 
 function removeEmptyDefaultSheet_(spreadsheet) {
@@ -677,7 +700,7 @@ function createAlert_(type, severity, cardId, title, message) {
 }
 
 function ensureDemoData_(spreadsheet) {
-  seedIfEmpty_(spreadsheet);
+  return seedIfEmpty_(spreadsheet);
 }
 
 function seedSheetIfEmpty_(sheet, rows) {
@@ -730,6 +753,24 @@ function buildSystemStatus_(spreadsheet) {
     message: missingSheets.length ? 'Some sheets are still missing and need repair.' : 'Spreadsheet connection is healthy.',
     sheetStatus: sheetStatus,
     missingSheets: missingSheets,
+  };
+}
+
+function runSetupCore_() {
+  const steps = [];
+  const spreadsheet = ensureProjectSpreadsheet_();
+  steps.push('spreadsheet-ready');
+
+  const sheetReport = initializeSheets_(spreadsheet);
+  steps.push('sheets-initialized');
+
+  ensureDemoData_(spreadsheet);
+  steps.push('demo-data-ensured');
+
+  return {
+    spreadsheet: spreadsheet,
+    steps: steps,
+    sheetReport: sheetReport,
   };
 }
 

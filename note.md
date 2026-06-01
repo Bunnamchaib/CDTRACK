@@ -47,3 +47,9 @@
 - ปัญหา: การใช้ `DriveApp` ใน setup หลักอาจทำให้รันจาก editor แล้ว fail แบบกว้าง ๆ ได้ ทั้งที่ผู้ใช้แค่ต้องการสร้าง spreadsheet และชีตเริ่มต้น
 - แก้อย่างไร: ให้ setup ใช้เฉพาะ `PropertiesService` + `SpreadsheetApp.openById()`/`SpreadsheetApp.create()` แล้วค่อย `initializeSheets_()` และ `ensureDemoData_()` โดยไม่แตะ Drive search ในจุดวิกฤต
 - ทำต่อ: อัปเดต `code.gs` นี้ขึ้น Apps Script แล้วลองรัน `setupProject` ใหม่จาก editor ถ้ายัง error ให้ดูข้อความใหม่ที่ควรละเอียดขึ้นกว่าของเดิม แล้วส่งกลับมาเพื่อตามแก้ต่อ
+
+## 2026-06-01 11:35:02
+- ทำอะไรไป: แยก `setupProject()` ให้เป็นฟังก์ชันตั้งต้นแบบปลอดภัย ใช้สำหรับรันจาก Apps Script editor โดยตรง, ย้าย payload ใหญ่ไปอยู่ใน `runSetupAndCheck()`, และเพิ่ม `runSetupCore_()` เป็นแกนกลางของงาน setup
+- ปัญหา: การให้ `setupProject()` สร้างชีตแล้วคำนวณ dashboard/reports/alerts ต่อทันทีอาจทำให้ error เกิดในส่วนที่ไม่เกี่ยวกับการสร้างตาราง แต่ผู้ใช้เห็นแค่ว่า setup พัง
+- แก้อย่างไร: ให้ `setupProject()` คืนผลลัพธ์สั้น ๆ แค่สถานะ setup, spreadsheet URL/ID, system status และ steps ที่วิ่งผ่าน ส่วนหน้าเว็บยังใช้ `runSetupAndCheck()` ได้เหมือนเดิม
+- ทำต่อ: อัปเดต `code.gs` เวอร์ชันนี้ขึ้น Apps Script แล้วรัน `setupProject` จาก editor ใหม่ ถ้าผ่านค่อยเปิด Web App แล้วค่อยกด `Setup sheets + demo data` ที่หน้าเว็บ
