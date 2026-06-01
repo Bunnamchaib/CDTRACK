@@ -53,3 +53,9 @@
 - ปัญหา: การให้ `setupProject()` สร้างชีตแล้วคำนวณ dashboard/reports/alerts ต่อทันทีอาจทำให้ error เกิดในส่วนที่ไม่เกี่ยวกับการสร้างตาราง แต่ผู้ใช้เห็นแค่ว่า setup พัง
 - แก้อย่างไร: ให้ `setupProject()` คืนผลลัพธ์สั้น ๆ แค่สถานะ setup, spreadsheet URL/ID, system status และ steps ที่วิ่งผ่าน ส่วนหน้าเว็บยังใช้ `runSetupAndCheck()` ได้เหมือนเดิม
 - ทำต่อ: อัปเดต `code.gs` เวอร์ชันนี้ขึ้น Apps Script แล้วรัน `setupProject` จาก editor ใหม่ ถ้าผ่านค่อยเปิด Web App แล้วค่อยกด `Setup sheets + demo data` ที่หน้าเว็บ
+
+## 2026-06-01 11:45:00
+- ทำอะไรไป: รีไรต์ `code.gs` ใหม่ทั้งไฟล์โดยโฟกัสให้ฟังก์ชัน `setupProject()` รันได้จริงก่อน, ลดความซับซ้อนของ backend, คง public functions ที่หน้าเว็บใช้ไว้ (`getAppData`, `runSetupAndCheck`, `saveCard`, `addTransaction`, `simulatePurchase`, `getSystemStatus`)
+- ปัญหา: ฟังก์ชัน setup เดิมถูกแก้หลายรอบจนมีความเสี่ยงจาก logic แทรกเยอะเกินไป ทำให้จับต้นตอการสร้างชีต/ข้อมูลดัมมี่ไม่ชัดและแก้ยาก
+- แก้อย่างไร: เริ่มใหม่ด้วยเส้นทาง setup ที่ตรงที่สุดคือ `getOrCreateProjectSpreadsheet_ -> ensureAllSheets_ -> ensureSeedData_ -> syncAlerts`, และให้ `setupProject()` คืนค่าเป็นข้อความสั้น ๆ สำหรับการรันจาก editor ส่วนหน้าเว็บใช้ `runSetupAndCheck()` แยกต่างหาก
+- ทำต่อ: เอา `code.gs` ล่าสุดนี้ขึ้น Apps Script แล้วรัน `setupProject` ทันที ถ้าผ่านจะได้ spreadsheet/ตาราง/ข้อมูลดัมมี่ก่อน จากนั้นค่อยทดสอบหน้า Web App

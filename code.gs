@@ -17,132 +17,80 @@ function doGet() {
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
 }
 
-function getAppData() {
-  const spreadsheet = openProjectSpreadsheet_();
-  if (!spreadsheet) {
-    return {
-      projectName: PROJECT_NAME,
-      needsSetup: true,
-      generatedAt: new Date().toISOString(),
-      systemStatus: buildSystemStatus_(null),
-    };
-  }
-
-  initializeSheets_(spreadsheet);
-  ensureDemoData_(spreadsheet);
-  const payload = buildAppPayload_(spreadsheet);
-  syncAlertsSheet_(spreadsheet, payload.alerts);
-  payload.systemStatus = buildSystemStatus_(spreadsheet);
-  return payload;
-}
-
 function setupProject() {
-  try {
-    const setupResult = runSetupCore_();
-    return {
-      ok: true,
-      projectName: PROJECT_NAME,
-      setupCompletedAt: new Date().toISOString(),
-      spreadsheetId: setupResult.spreadsheet.getId(),
-      spreadsheetUrl: setupResult.spreadsheet.getUrl(),
-      systemStatus: buildSystemStatus_(setupResult.spreadsheet),
-      steps: setupResult.steps,
-    };
-  } catch (error) {
-    throw new Error('setupProject failed: ' + (error && error.message ? error.message : error));
-  }
-}
-
-function getSystemStatus() {
-  try {
-    const spreadsheet = openProjectSpreadsheet_();
-    return buildSystemStatus_(spreadsheet);
-  } catch (error) {
-    return {
-      projectName: PROJECT_NAME,
-      connected: false,
-      spreadsheetFound: false,
-      message: 'System status check failed: ' + (error && error.message ? error.message : error),
-      sheetStatus: [],
-      missingSheets: Object.keys(SHEET_DEFINITIONS),
-    };
-  }
+  const result = runSetupCore_();
+  Logger.log(JSON.stringify(result));
+  return 'Setup complete. Spreadsheet URL: ' + result.spreadsheetUrl;
 }
 
 function runSetupAndCheck() {
-  try {
-    const setupResult = runSetupCore_();
-    const payload = buildAppPayload_(setupResult.spreadsheet);
-    syncAlertsSheet_(setupResult.spreadsheet, payload.alerts);
-    payload.systemStatus = buildSystemStatus_(setupResult.spreadsheet);
-    payload.setupCompletedAt = new Date().toISOString();
-    payload.setupSteps = setupResult.steps;
-    return payload;
-  } catch (error) {
-    throw new Error('runSetupAndCheck failed: ' + (error && error.message ? error.message : error));
+  const result = runSetupCore_();
+  const payload = buildAppState_(result.spreadsheet);
+  payload.setupCompletedAt = new Date().toISOString();
+  payload.setupSteps = result.steps;
+  return payload;
+}
+
+function getAppData() {
+  const spreadsheet = openProjectSpreadsheet_();
+  if (!spreadsheet) {
+    return emptyAppState_();
   }
+
+  ensureAllSheets_(spreadsheet);
+  ensureSeedData_(spreadsheet);
+  return buildAppState_(spreadsheet);
+}
+
+function getSystemStatus() {
+  return buildSystemStatus_(openProjectSpreadsheet_());
 }
 
 function saveCard(cardInput) {
   const spreadsheet = getRequiredSpreadsheet_();
-  initializeSheets_(spreadsheet);
+  ensureAllSheets_(spreadsheet);
 
-  const sheet = spreadsheet.getSheetByName('Cards');
   const now = new Date().toISOString();
   const card = {
-    id: (cardInput.id || '').trim() || createId_('CARD'),
+    id: sanitizeText_(cardInput.id) || createId_('CARD'),
     cardName: sanitizeText_(cardInput.cardName),
     bankName: sanitizeText_(cardInput.bankName),
     creditLimit: parseNumber_(cardInput.creditLimit),
-    statementDay: parseInt(cardInput.statementDay, 10) || 1,
-    paymentDueDay: parseInt(cardInput.paymentDueDay, 10) || 1,
+    statementDay: normalizeDay_(cardInput.statementDay),
+    paymentDueDay: normalizeDay_(cardInput.paymentDueDay),
     cardColor: sanitizeText_(cardInput.cardColor) || '#a78bfa',
     cardType: sanitizeText_(cardInput.cardType) || 'General',
     notes: sanitizeText_(cardInput.notes),
     isActive: normalizeBoolean_(cardInput.isActive),
-    createdAt: cardInput.createdAt || now,
+    createdAt: sanitizeText_(cardInput.createdAt) || now,
     updatedAt: now,
   };
 
   if (!card.cardName) {
     throw new Error('Card name is required.');
   }
-
   if (!card.bankName) {
     throw new Error('Bank name is required.');
   }
-
   if (card.creditLimit <= 0) {
     throw new Error('Credit limit must be greater than 0.');
   }
 
-  upsertRowById_(sheet, card.id, card);
-
-  const payload = buildAppPayload_(spreadsheet);
-  syncAlertsSheet_(spreadsheet, payload.alerts);
-  return payload;
+  upsertObjectById_(spreadsheet.getSheetByName('Cards'), card);
+  syncAlertsForSpreadsheet_(spreadsheet);
+  return buildAppState_(spreadsheet);
 }
 
 function addTransaction(transactionInput) {
   const spreadsheet = getRequiredSpreadsheet_();
-  initializeSheets_(spreadsheet);
-
-  const cardId = sanitizeText_(transactionInput.cardId);
-  if (!cardId) {
-    throw new Error('Please choose a credit card.');
-  }
-
-  const amount = parseNumber_(transactionInput.amount);
-  if (amount <= 0) {
-    throw new Error('Amount must be greater than 0.');
-  }
+  ensureAllSheets_(spreadsheet);
 
   const transaction = {
     id: createId_('TXN'),
-    cardId: cardId,
-    date: sanitizeText_(transactionInput.date) || formatDateKey_(new Date()),
-    amount: amount,
-    merchant: sanitizeText_(transactionInput.merchant) || 'Unknown merchant',
+    cardId: sanitizeText_(transactionInput.cardId),
+    date: normalizeDateText_(transactionInput.date) || formatDateKey_(new Date()),
+    amount: parseNumber_(transactionInput.amount),
+    merchant: sanitizeText_(transactionInput.merchant),
     category: sanitizeText_(transactionInput.category) || 'Others',
     notes: sanitizeText_(transactionInput.notes),
     receiptImageUrl: '',
@@ -150,23 +98,50 @@ function addTransaction(transactionInput) {
     updatedAt: new Date().toISOString(),
   };
 
-  appendObjectRow_(spreadsheet.getSheetByName('Transactions'), transaction);
+  if (!transaction.cardId) {
+    throw new Error('Please choose a credit card.');
+  }
+  if (transaction.amount <= 0) {
+    throw new Error('Amount must be greater than 0.');
+  }
+  if (!transaction.merchant) {
+    throw new Error('Merchant is required.');
+  }
 
-  const payload = buildAppPayload_(spreadsheet);
-  syncAlertsSheet_(spreadsheet, payload.alerts);
-  return payload;
+  appendObjectRow_(spreadsheet.getSheetByName('Transactions'), transaction);
+  syncAlertsForSpreadsheet_(spreadsheet);
+  return buildAppState_(spreadsheet);
 }
 
 function simulatePurchase(amountInput) {
   const spreadsheet = getRequiredSpreadsheet_();
-  const payload = buildAppPayload_(spreadsheet);
-  const amount = parseNumber_(amountInput);
-  return buildSimulatorResult_(payload.cards, amount);
+  const state = buildAppState_(spreadsheet);
+  return buildSimulator_(state.cards, parseNumber_(amountInput));
 }
 
-function ensureProjectSpreadsheet_() {
+function runSetupCore_() {
+  const spreadsheet = getOrCreateProjectSpreadsheet_();
+  const steps = [];
+
+  steps.push('spreadsheet-ready');
+  steps.push.apply(steps, ensureAllSheets_(spreadsheet));
+  steps.push.apply(steps, ensureSeedData_(spreadsheet));
+  syncAlertsForSpreadsheet_(spreadsheet);
+  steps.push('alerts-synced');
+
+  return {
+    ok: true,
+    steps: steps,
+    spreadsheetId: spreadsheet.getId(),
+    spreadsheetUrl: spreadsheet.getUrl(),
+    spreadsheet: spreadsheet,
+  };
+}
+
+function getOrCreateProjectSpreadsheet_() {
   const properties = PropertiesService.getScriptProperties();
   const spreadsheetId = properties.getProperty(SPREADSHEET_PROPERTY_KEY);
+
   if (spreadsheetId) {
     try {
       return SpreadsheetApp.openById(spreadsheetId);
@@ -181,8 +156,7 @@ function ensureProjectSpreadsheet_() {
 }
 
 function openProjectSpreadsheet_() {
-  const properties = PropertiesService.getScriptProperties();
-  const spreadsheetId = properties.getProperty(SPREADSHEET_PROPERTY_KEY);
+  const spreadsheetId = PropertiesService.getScriptProperties().getProperty(SPREADSHEET_PROPERTY_KEY);
   if (!spreadsheetId) {
     return null;
   }
@@ -190,109 +164,107 @@ function openProjectSpreadsheet_() {
   try {
     return SpreadsheetApp.openById(spreadsheetId);
   } catch (error) {
-    properties.deleteProperty(SPREADSHEET_PROPERTY_KEY);
+    PropertiesService.getScriptProperties().deleteProperty(SPREADSHEET_PROPERTY_KEY);
     return null;
   }
 }
 
 function getRequiredSpreadsheet_() {
   const spreadsheet = openProjectSpreadsheet_();
-  if (!spreadsheet) {
-    throw new Error('Please run setup first to create the spreadsheet and seed demo data.');
+  if (spreadsheet) {
+    return spreadsheet;
   }
-  return spreadsheet;
+  return runSetupCore_().spreadsheet;
 }
 
-function initializeSheets_(spreadsheet) {
-  const report = [];
+function ensureAllSheets_(spreadsheet) {
+  const steps = [];
+
   Object.keys(SHEET_DEFINITIONS).forEach(function(sheetName) {
     const headers = SHEET_DEFINITIONS[sheetName];
     let sheet = spreadsheet.getSheetByName(sheetName);
     let action = 'checked';
+
     if (!sheet) {
       sheet = spreadsheet.insertSheet(sheetName);
       action = 'created';
     }
 
-    if (sheet.getLastRow() === 0) {
+    if (!sheetHeadersMatch_(sheet, headers)) {
+      sheet.clearContents();
       sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
       sheet.setFrozenRows(1);
-      action = action === 'created' ? 'created+headers' : 'headers-added';
-    } else {
-      const existingHeaders = sheet.getRange(1, 1, 1, headers.length).getValues()[0];
-      if (existingHeaders.join('|') !== headers.join('|')) {
-        sheet.clear();
-        sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
-        sheet.setFrozenRows(1);
-        action = 'headers-reset';
-      }
+      action = action === 'created' ? 'created-with-headers' : 'headers-reset';
     }
 
-    report.push({
-      sheetName: sheetName,
-      action: action,
-      rowCount: Math.max(sheet.getLastRow() - 1, 0),
-    });
+    steps.push(sheetName + ':' + action);
   });
 
-  removeEmptyDefaultSheet_(spreadsheet);
-  return report;
+  return steps;
 }
 
-function removeEmptyDefaultSheet_(spreadsheet) {
-  const defaultSheet = spreadsheet.getSheetByName('Sheet1');
-  if (!defaultSheet || spreadsheet.getSheets().length <= 1) {
-    return;
+function ensureSeedData_(spreadsheet) {
+  const steps = [];
+
+  if (writeRowsIfEmpty_(spreadsheet.getSheetByName('Cards'), buildSampleCards_())) {
+    steps.push('cards-seeded');
+  } else {
+    steps.push('cards-ready');
   }
 
-  const values = defaultSheet.getDataRange().getValues();
-  const isEmpty = values.length === 1 && values[0].join('').trim() === '';
-  if (isEmpty) {
-    spreadsheet.deleteSheet(defaultSheet);
+  if (writeRowsIfEmpty_(spreadsheet.getSheetByName('Transactions'), buildSampleTransactions_())) {
+    steps.push('transactions-seeded');
+  } else {
+    steps.push('transactions-ready');
   }
+
+  if (writeRowsIfEmpty_(spreadsheet.getSheetByName('Payments'), buildSamplePayments_())) {
+    steps.push('payments-seeded');
+  } else {
+    steps.push('payments-ready');
+  }
+
+  if (writeRowsIfEmpty_(spreadsheet.getSheetByName('Installments'), buildSampleInstallments_())) {
+    steps.push('installments-seeded');
+  } else {
+    steps.push('installments-ready');
+  }
+
+  if (writeRowsIfEmpty_(spreadsheet.getSheetByName('Settings'), buildSampleSettings_())) {
+    steps.push('settings-seeded');
+  } else {
+    steps.push('settings-ready');
+  }
+
+  return steps;
 }
 
-function seedIfEmpty_(spreadsheet) {
+function writeRowsIfEmpty_(sheet, rows) {
+  if (!sheet || !rows.length) {
+    return false;
+  }
+
+  if (sheet.getLastRow() > 1) {
+    return false;
+  }
+
+  sheet.getRange(2, 1, rows.length, rows[0].length).setValues(rows);
+  return true;
+}
+
+function buildSampleCards_() {
   const now = new Date().toISOString();
-  const cards = [
+  return [
     ['CARD-1001', 'KBank Everyday', 'Kasikornbank', 85000, 12, 5, '#a78bfa', 'Rewards', 'Best for daily spending', true, now, now],
-    ['CARD-1002', 'SCB Smart Travel', 'SCB', 120000, 18, 10, '#34d399', 'Travel', 'Used for flights and hotels', true, now, now],
-    ['CARD-1003', 'Krungsri Family', 'Krungsri', 60000, 24, 15, '#f59e0b', 'Cashback', 'Good for groceries and utilities', true, now, now],
-    ['CARD-1004', 'TTB Reserve', 'TTB', 150000, 28, 20, '#f472b6', 'Premium', 'Main backup card with high limit', true, now, now],
+    ['CARD-1002', 'SCB Smart Travel', 'SCB', 120000, 18, 10, '#34d399', 'Travel', 'Flights and hotels', true, now, now],
+    ['CARD-1003', 'Krungsri Family', 'Krungsri', 60000, 24, 15, '#f59e0b', 'Cashback', 'Groceries and utilities', true, now, now],
+    ['CARD-1004', 'TTB Reserve', 'TTB', 150000, 28, 20, '#f472b6', 'Premium', 'High limit backup card', true, now, now],
   ];
-
-  const transactions = buildSampleTransactions_(now);
-  const payments = [
-    ['PAY-3001', 'CARD-1001', daysAgo_(18), 4200, 'Paid mobile and food spend', now, now],
-    ['PAY-3002', 'CARD-1002', daysAgo_(10), 8000, 'Partial payment after travel booking', now, now],
-    ['PAY-3003', 'CARD-1003', daysAgo_(7), 2500, 'Paid grocery and electric bills', now, now],
-    ['PAY-3004', 'CARD-1004', daysAgo_(5), 12000, 'Reduced premium card utilization', now, now],
-    ['PAY-3005', 'CARD-1001', daysAgo_(2), 3100, 'Top-up payment before due date', now, now],
-  ];
-
-  const installments = [
-    ['INS-4001', 'CARD-1002', 'Tokyo Flight Package', 36000, 6, 6000, 2, daysAgo_(55), daysFromToday_(6), 'Travel installment plan', now, now],
-    ['INS-4002', 'CARD-1003', 'Washing Machine', 18000, 9, 2000, 5, daysAgo_(140), daysFromToday_(12), 'Home appliance installment', now, now],
-    ['INS-4003', 'CARD-1004', 'MacBook Upgrade', 54000, 12, 4500, 3, daysAgo_(82), daysFromToday_(3), 'Work device installment', now, now],
-  ];
-
-  const settings = [
-    ['currency', 'THB', 'Display currency code'],
-    ['warningUtilization', '50', 'Low alert threshold'],
-    ['dangerUtilization', '80', 'High alert threshold'],
-    ['statementNoticeDays', '7,3,1', 'Days before statement date to alert'],
-    ['paymentNoticeDays', '7,3,1', 'Days before payment due date to alert'],
-  ];
-
-  seedSheetIfEmpty_(spreadsheet.getSheetByName('Cards'), cards);
-  seedSheetIfEmpty_(spreadsheet.getSheetByName('Transactions'), transactions);
-  seedSheetIfEmpty_(spreadsheet.getSheetByName('Payments'), payments);
-  seedSheetIfEmpty_(spreadsheet.getSheetByName('Installments'), installments);
-  seedSheetIfEmpty_(spreadsheet.getSheetByName('Settings'), settings);
 }
 
-function buildSampleTransactions_(timestamp) {
-  const templates = [
+function buildSampleTransactions_() {
+  const now = new Date().toISOString();
+  const items = [
     ['CARD-1001', daysAgo_(30), 245, 'Cafe Amazon', 'Food & Dining', 'Morning coffee'],
     ['CARD-1001', daysAgo_(28), 1380, '7-Eleven', 'Food & Dining', 'Groceries and snacks'],
     ['CARD-1001', daysAgo_(24), 890, 'Grab', 'Travel', 'Commute to office'],
@@ -302,7 +274,7 @@ function buildSampleTransactions_(timestamp) {
     ['CARD-1002', daysAgo_(34), 12500, 'AirAsia', 'Travel', 'Flight booking'],
     ['CARD-1002', daysAgo_(31), 4200, 'Booking.com', 'Travel', 'Hotel deposit'],
     ['CARD-1002', daysAgo_(26), 960, 'Starbucks', 'Food & Dining', 'Coffee meeting'],
-    ['CARD-1002', daysAgo_(19), 3280, 'Boots', 'Healthcare', 'Pharmacy and health products'],
+    ['CARD-1002', daysAgo_(19), 3280, 'Boots', 'Healthcare', 'Health products'],
     ['CARD-1002', daysAgo_(11), 2400, 'Shell', 'Fuel', 'Road trip fuel'],
     ['CARD-1002', daysAgo_(1), 6800, 'Apple Store', 'Shopping', 'AirPods upgrade'],
     ['CARD-1003', daysAgo_(29), 1850, 'Big C', 'Food & Dining', 'Weekly groceries'],
@@ -314,12 +286,12 @@ function buildSampleTransactions_(timestamp) {
     ['CARD-1004', daysAgo_(33), 15500, 'Power Buy', 'Shopping', 'Monitor purchase'],
     ['CARD-1004', daysAgo_(27), 4700, 'Bangkok Hospital', 'Healthcare', 'Annual check-up'],
     ['CARD-1004', daysAgo_(23), 8800, 'Lazada', 'Shopping', 'Office chair and desk lamp'],
-    ['CARD-1004', daysAgo_(14), 3600, 'True', 'Utilities', 'Fiber internet annual add-on'],
+    ['CARD-1004', daysAgo_(14), 3600, 'True', 'Utilities', 'Fiber internet add-on'],
     ['CARD-1004', daysAgo_(6), 5400, 'Major Cineplex', 'Entertainment', 'Family movie night'],
     ['CARD-1004', daysAgo_(3), 6200, 'Thai Airways', 'Travel', 'Domestic work trip'],
   ];
 
-  return templates.map(function(item, index) {
+  return items.map(function(item, index) {
     return [
       'TXN-' + (2001 + index),
       item[0],
@@ -329,126 +301,62 @@ function buildSampleTransactions_(timestamp) {
       item[4],
       item[5],
       '',
-      timestamp,
-      timestamp,
+      now,
+      now,
     ];
   });
 }
 
-function buildAppPayload_(spreadsheet) {
-  const rawCards = getSheetObjects_(spreadsheet.getSheetByName('Cards'));
-  const rawTransactions = getSheetObjects_(spreadsheet.getSheetByName('Transactions'));
-  const rawPayments = getSheetObjects_(spreadsheet.getSheetByName('Payments'));
-  const rawInstallments = getSheetObjects_(spreadsheet.getSheetByName('Installments'));
-  const settings = getSettingsMap_(spreadsheet.getSheetByName('Settings'));
+function buildSamplePayments_() {
+  const now = new Date().toISOString();
+  return [
+    ['PAY-3001', 'CARD-1001', daysAgo_(18), 4200, 'Paid mobile and food spend', now, now],
+    ['PAY-3002', 'CARD-1002', daysAgo_(10), 8000, 'Partial payment after travel booking', now, now],
+    ['PAY-3003', 'CARD-1003', daysAgo_(7), 2500, 'Paid grocery and electric bills', now, now],
+    ['PAY-3004', 'CARD-1004', daysAgo_(5), 12000, 'Reduced premium card utilization', now, now],
+    ['PAY-3005', 'CARD-1001', daysAgo_(2), 3100, 'Top-up payment before due date', now, now],
+  ];
+}
 
-  const cardLookup = {};
-  const cardSummaries = rawCards.map(function(card) {
-    const limit = parseNumber_(card.creditLimit);
-    const transactionTotal = rawTransactions
-      .filter(function(transaction) { return transaction.cardId === card.id; })
-      .reduce(function(sum, transaction) { return sum + parseNumber_(transaction.amount); }, 0);
-    const paymentTotal = rawPayments
-      .filter(function(payment) { return payment.cardId === card.id; })
-      .reduce(function(sum, payment) { return sum + parseNumber_(payment.amount); }, 0);
+function buildSampleInstallments_() {
+  const now = new Date().toISOString();
+  return [
+    ['INS-4001', 'CARD-1002', 'Tokyo Flight Package', 36000, 6, 6000, 2, daysAgo_(55), daysFromToday_(6), 'Travel installment plan', now, now],
+    ['INS-4002', 'CARD-1003', 'Washing Machine', 18000, 9, 2000, 5, daysAgo_(140), daysFromToday_(12), 'Home appliance installment', now, now],
+    ['INS-4003', 'CARD-1004', 'MacBook Upgrade', 54000, 12, 4500, 3, daysAgo_(82), daysFromToday_(3), 'Work device installment', now, now],
+  ];
+}
 
-    const currentBalance = Math.max(transactionTotal - paymentTotal, 0);
-    const availableCredit = Math.max(limit - currentBalance, 0);
-    const utilization = limit > 0 ? round2_((currentBalance / limit) * 100) : 0;
-    const statementDate = nextMonthlyDate_(card.statementDay);
-    const paymentDueDate = nextMonthlyDate_(card.paymentDueDay);
+function buildSampleSettings_() {
+  return [
+    ['currency', 'THB', 'Display currency code'],
+    ['warningUtilization', '50', 'Low alert threshold'],
+    ['dangerUtilization', '80', 'High alert threshold'],
+    ['statementNoticeDays', '7,3,1', 'Days before statement date to alert'],
+    ['paymentNoticeDays', '7,3,1', 'Days before payment due date to alert'],
+  ];
+}
 
-    const summary = {
-      id: card.id,
-      cardName: sanitizeText_(card.cardName),
-      bankName: sanitizeText_(card.bankName),
-      creditLimit: limit,
-      statementDay: parseInt(card.statementDay, 10) || 1,
-      paymentDueDay: parseInt(card.paymentDueDay, 10) || 1,
-      cardColor: sanitizeText_(card.cardColor) || '#a78bfa',
-      cardType: sanitizeText_(card.cardType) || 'General',
-      notes: sanitizeText_(card.notes),
-      isActive: normalizeBoolean_(card.isActive),
-      createdAt: card.createdAt,
-      updatedAt: card.updatedAt,
-      currentBalance: round2_(currentBalance),
-      availableCredit: round2_(availableCredit),
-      utilization: utilization,
-      statementDate: formatDateKey_(statementDate),
-      paymentDueDate: formatDateKey_(paymentDueDate),
-      statementInDays: daysBetweenToday_(statementDate),
-      paymentDueInDays: daysBetweenToday_(paymentDueDate),
-      statusColor: utilizationColor_(utilization),
-    };
+function buildAppState_(spreadsheet) {
+  ensureAllSheets_(spreadsheet);
 
-    cardLookup[summary.id] = summary;
-    return summary;
-  });
+  const cardsRaw = readSheetObjects_(spreadsheet.getSheetByName('Cards'));
+  const transactionsRaw = readSheetObjects_(spreadsheet.getSheetByName('Transactions'));
+  const paymentsRaw = readSheetObjects_(spreadsheet.getSheetByName('Payments'));
+  const installmentsRaw = readSheetObjects_(spreadsheet.getSheetByName('Installments'));
+  const settings = readSettings_(spreadsheet.getSheetByName('Settings'));
 
-  const transactions = rawTransactions
-    .map(function(transaction) {
-      const card = cardLookup[transaction.cardId];
-      return {
-        id: transaction.id,
-        cardId: transaction.cardId,
-        cardName: card ? card.cardName : 'Unknown card',
-        bankName: card ? card.bankName : '',
-        date: normalizeDateString_(transaction.date),
-        amount: parseNumber_(transaction.amount),
-        merchant: sanitizeText_(transaction.merchant),
-        category: sanitizeText_(transaction.category),
-        notes: sanitizeText_(transaction.notes),
-      };
-    })
-    .sort(sortByDateDesc_);
+  const cards = buildCardSummaries_(cardsRaw, transactionsRaw, paymentsRaw);
+  const cardMap = toMapById_(cards);
+  const transactions = buildTransactions_(transactionsRaw, cardMap);
+  const payments = buildPayments_(paymentsRaw, cardMap);
+  const installments = buildInstallments_(installmentsRaw, cardMap);
+  const alerts = buildAlerts_(cards, installments, settings);
+  const reports = buildReports_(transactions, cards);
+  const dashboard = buildDashboard_(cards, transactions, alerts);
+  const insights = buildInsights_(cards, transactions, reports);
 
-  const payments = rawPayments
-    .map(function(payment) {
-      const card = cardLookup[payment.cardId];
-      return {
-        id: payment.id,
-        cardId: payment.cardId,
-        cardName: card ? card.cardName : 'Unknown card',
-        date: normalizeDateString_(payment.date),
-        amount: parseNumber_(payment.amount),
-        notes: sanitizeText_(payment.notes),
-      };
-    })
-    .sort(sortByDateDesc_);
-
-  const installments = rawInstallments.map(function(installment) {
-    const card = cardLookup[installment.cardId];
-    const totalPrice = parseNumber_(installment.totalPrice);
-    const monthlyPayment = parseNumber_(installment.monthlyPayment);
-    const numberOfInstallments = parseInt(installment.numberOfInstallments, 10) || 0;
-    const completedInstallments = parseInt(installment.completedInstallments, 10) || 0;
-    const remainingInstallments = Math.max(numberOfInstallments - completedInstallments, 0);
-    const nextPaymentDate = toDate_(installment.nextPaymentDate);
-
-    return {
-      id: installment.id,
-      cardId: installment.cardId,
-      cardName: card ? card.cardName : 'Unknown card',
-      productName: sanitizeText_(installment.productName),
-      totalPrice: totalPrice,
-      numberOfInstallments: numberOfInstallments,
-      monthlyPayment: monthlyPayment,
-      completedInstallments: completedInstallments,
-      remainingInstallments: remainingInstallments,
-      outstandingBalance: round2_(monthlyPayment * remainingInstallments),
-      startDate: normalizeDateString_(installment.startDate),
-      nextPaymentDate: formatDateKey_(nextPaymentDate),
-      nextPaymentInDays: daysBetweenToday_(nextPaymentDate),
-      notes: sanitizeText_(installment.notes),
-    };
-  }).sort(function(a, b) {
-    return a.nextPaymentInDays - b.nextPaymentInDays;
-  });
-
-  const alerts = buildAlerts_(cardSummaries, installments, settings);
-  const reports = buildReports_(transactions, cardSummaries);
-  const dashboard = buildDashboard_(cardSummaries, transactions, alerts);
-  const insights = buildInsights_(cardSummaries, transactions, reports);
+  syncAlertsSheet_(spreadsheet, alerts);
 
   return {
     projectName: PROJECT_NAME,
@@ -456,10 +364,9 @@ function buildAppPayload_(spreadsheet) {
     needsSetup: false,
     spreadsheetId: spreadsheet.getId(),
     spreadsheetUrl: spreadsheet.getUrl(),
+    systemStatus: buildSystemStatus_(spreadsheet),
     dashboard: dashboard,
-    cards: cardSummaries.sort(function(a, b) {
-      return b.availableCredit - a.availableCredit;
-    }),
+    cards: cards,
     transactions: transactions,
     payments: payments,
     installments: installments,
@@ -467,22 +374,158 @@ function buildAppPayload_(spreadsheet) {
     reports: reports,
     insights: insights,
     settings: settings,
-    simulatorExample: buildSimulatorResult_(cardSummaries, 5000),
+    simulatorExample: buildSimulator_(cards, 5000),
   };
+}
+
+function emptyAppState_() {
+  return {
+    projectName: PROJECT_NAME,
+    generatedAt: new Date().toISOString(),
+    needsSetup: true,
+    spreadsheetId: '',
+    spreadsheetUrl: '',
+    systemStatus: buildSystemStatus_(null),
+    dashboard: {
+      totalCreditLimit: 0,
+      totalCurrentBalance: 0,
+      totalAvailableCredit: 0,
+      overallUtilization: 0,
+      activeCardCount: 0,
+      alertCount: 0,
+      recentTransactions: [],
+    },
+    cards: [],
+    transactions: [],
+    payments: [],
+    installments: [],
+    alerts: [],
+    reports: {
+      monthlySpending: [],
+      categorySpending: [],
+      cardSpending: [],
+      merchantUsage: [],
+      topTransactions: [],
+      utilizationByCard: [],
+    },
+    insights: [],
+    settings: {},
+    simulatorExample: buildSimulator_([], 5000),
+  };
+}
+
+function buildCardSummaries_(cardsRaw, transactionsRaw, paymentsRaw) {
+  const cards = cardsRaw.map(function(card) {
+    const transactionTotal = sumByCard_(transactionsRaw, card.id);
+    const paymentTotal = sumByCard_(paymentsRaw, card.id);
+    const creditLimit = parseNumber_(card.creditLimit);
+    const currentBalance = round2_(Math.max(transactionTotal - paymentTotal, 0));
+    const availableCredit = round2_(Math.max(creditLimit - currentBalance, 0));
+    const utilization = creditLimit > 0 ? round2_((currentBalance / creditLimit) * 100) : 0;
+    const statementDate = nextMonthlyDate_(card.statementDay);
+    const paymentDueDate = nextMonthlyDate_(card.paymentDueDay);
+
+    return {
+      id: sanitizeText_(card.id),
+      cardName: sanitizeText_(card.cardName),
+      bankName: sanitizeText_(card.bankName),
+      creditLimit: creditLimit,
+      statementDay: normalizeDay_(card.statementDay),
+      paymentDueDay: normalizeDay_(card.paymentDueDay),
+      cardColor: sanitizeText_(card.cardColor) || '#a78bfa',
+      cardType: sanitizeText_(card.cardType) || 'General',
+      notes: sanitizeText_(card.notes),
+      isActive: normalizeBoolean_(card.isActive),
+      createdAt: sanitizeText_(card.createdAt),
+      updatedAt: sanitizeText_(card.updatedAt),
+      currentBalance: currentBalance,
+      availableCredit: availableCredit,
+      utilization: utilization,
+      statementDate: formatDateKey_(statementDate),
+      paymentDueDate: formatDateKey_(paymentDueDate),
+      statementInDays: daysBetweenToday_(statementDate),
+      paymentDueInDays: daysBetweenToday_(paymentDueDate),
+      statusColor: utilizationColor_(utilization),
+    };
+  });
+
+  return cards.sort(function(a, b) {
+    return b.availableCredit - a.availableCredit;
+  });
+}
+
+function buildTransactions_(rows, cardMap) {
+  return rows.map(function(row) {
+    const card = cardMap[row.cardId];
+    return {
+      id: sanitizeText_(row.id),
+      cardId: sanitizeText_(row.cardId),
+      cardName: card ? card.cardName : 'Unknown card',
+      bankName: card ? card.bankName : '',
+      date: normalizeDateText_(row.date),
+      amount: parseNumber_(row.amount),
+      merchant: sanitizeText_(row.merchant),
+      category: sanitizeText_(row.category),
+      notes: sanitizeText_(row.notes),
+    };
+  }).sort(sortByDateDesc_);
+}
+
+function buildPayments_(rows, cardMap) {
+  return rows.map(function(row) {
+    const card = cardMap[row.cardId];
+    return {
+      id: sanitizeText_(row.id),
+      cardId: sanitizeText_(row.cardId),
+      cardName: card ? card.cardName : 'Unknown card',
+      date: normalizeDateText_(row.date),
+      amount: parseNumber_(row.amount),
+      notes: sanitizeText_(row.notes),
+    };
+  }).sort(sortByDateDesc_);
+}
+
+function buildInstallments_(rows, cardMap) {
+  return rows.map(function(row) {
+    const numberOfInstallments = parseInteger_(row.numberOfInstallments);
+    const completedInstallments = parseInteger_(row.completedInstallments);
+    const remainingInstallments = Math.max(numberOfInstallments - completedInstallments, 0);
+    const monthlyPayment = parseNumber_(row.monthlyPayment);
+    const nextPaymentDate = toDate_(row.nextPaymentDate);
+    const card = cardMap[row.cardId];
+
+    return {
+      id: sanitizeText_(row.id),
+      cardId: sanitizeText_(row.cardId),
+      cardName: card ? card.cardName : 'Unknown card',
+      productName: sanitizeText_(row.productName),
+      totalPrice: parseNumber_(row.totalPrice),
+      numberOfInstallments: numberOfInstallments,
+      monthlyPayment: monthlyPayment,
+      completedInstallments: completedInstallments,
+      remainingInstallments: remainingInstallments,
+      outstandingBalance: round2_(remainingInstallments * monthlyPayment),
+      startDate: normalizeDateText_(row.startDate),
+      nextPaymentDate: formatDateKey_(nextPaymentDate),
+      nextPaymentInDays: daysBetweenToday_(nextPaymentDate),
+      notes: sanitizeText_(row.notes),
+    };
+  }).sort(function(a, b) {
+    return a.nextPaymentInDays - b.nextPaymentInDays;
+  });
 }
 
 function buildDashboard_(cards, transactions, alerts) {
   const activeCards = cards.filter(function(card) { return card.isActive; });
-  const totalCreditLimit = activeCards.reduce(function(sum, card) { return sum + card.creditLimit; }, 0);
-  const totalCurrentBalance = activeCards.reduce(function(sum, card) { return sum + card.currentBalance; }, 0);
-  const totalAvailableCredit = activeCards.reduce(function(sum, card) { return sum + card.availableCredit; }, 0);
-  const utilization = totalCreditLimit > 0 ? round2_((totalCurrentBalance / totalCreditLimit) * 100) : 0;
+  const totalCreditLimit = round2_(activeCards.reduce(function(sum, card) { return sum + card.creditLimit; }, 0));
+  const totalCurrentBalance = round2_(activeCards.reduce(function(sum, card) { return sum + card.currentBalance; }, 0));
+  const totalAvailableCredit = round2_(activeCards.reduce(function(sum, card) { return sum + card.availableCredit; }, 0));
 
   return {
-    totalCreditLimit: round2_(totalCreditLimit),
-    totalCurrentBalance: round2_(totalCurrentBalance),
-    totalAvailableCredit: round2_(totalAvailableCredit),
-    overallUtilization: utilization,
+    totalCreditLimit: totalCreditLimit,
+    totalCurrentBalance: totalCurrentBalance,
+    totalAvailableCredit: totalAvailableCredit,
+    overallUtilization: totalCreditLimit > 0 ? round2_((totalCurrentBalance / totalCreditLimit) * 100) : 0,
     activeCardCount: activeCards.length,
     alertCount: alerts.length,
     recentTransactions: transactions.slice(0, 8),
@@ -491,89 +534,66 @@ function buildDashboard_(cards, transactions, alerts) {
 
 function buildReports_(transactions, cards) {
   const monthlyMap = {};
-  const monthlyLabelMap = {};
+  const monthlyLabels = {};
   const categoryMap = {};
-  const cardMap = {};
   const merchantMap = {};
-  const cardLookup = {};
+  const cardMap = {};
+  const cardNameMap = toMapById_(cards);
 
-  cards.forEach(function(card) {
-    cardLookup[card.id] = card.cardName;
-  });
-
-  transactions.forEach(function(transaction) {
-    const date = toDate_(transaction.date);
+  transactions.forEach(function(item) {
+    const date = toDate_(item.date);
     const monthKey = Utilities.formatDate(date, APP_TIMEZONE, 'yyyy-MM');
-    monthlyLabelMap[monthKey] = Utilities.formatDate(date, APP_TIMEZONE, 'MMM yyyy');
-
-    monthlyMap[monthKey] = (monthlyMap[monthKey] || 0) + transaction.amount;
-    categoryMap[transaction.category] = (categoryMap[transaction.category] || 0) + transaction.amount;
-    cardMap[transaction.cardId] = (cardMap[transaction.cardId] || 0) + transaction.amount;
-    merchantMap[transaction.merchant] = (merchantMap[transaction.merchant] || 0) + transaction.amount;
-  });
-
-  const monthlySpending = Object.keys(monthlyMap)
-    .sort()
-    .map(function(key) {
-      return {
-        key: key,
-        label: monthlyLabelMap[key],
-        value: round2_(monthlyMap[key]),
-      };
-    });
-
-  const categorySpending = toSortedSeries_(categoryMap, function(key) { return key; });
-  const cardSpending = toSortedSeries_(cardMap, function(key) { return cardLookup[key] || key; });
-  const merchantUsage = toSortedSeries_(merchantMap, function(key) { return key; }).slice(0, 6);
-  const topTransactions = transactions.slice().sort(function(a, b) {
-    return b.amount - a.amount;
-  }).slice(0, 10);
-  const utilizationByCard = cards.map(function(card) {
-    return { label: card.cardName, value: card.utilization };
-  }).sort(function(a, b) {
-    return b.value - a.value;
+    monthlyMap[monthKey] = (monthlyMap[monthKey] || 0) + item.amount;
+    monthlyLabels[monthKey] = Utilities.formatDate(date, APP_TIMEZONE, 'MMM yyyy');
+    categoryMap[item.category] = (categoryMap[item.category] || 0) + item.amount;
+    merchantMap[item.merchant] = (merchantMap[item.merchant] || 0) + item.amount;
+    cardMap[item.cardId] = (cardMap[item.cardId] || 0) + item.amount;
   });
 
   return {
-    monthlySpending: monthlySpending,
-    categorySpending: categorySpending,
-    cardSpending: cardSpending,
-    merchantUsage: merchantUsage,
-    topTransactions: topTransactions,
-    utilizationByCard: utilizationByCard,
+    monthlySpending: Object.keys(monthlyMap).sort().map(function(key) {
+      return { key: key, label: monthlyLabels[key], value: round2_(monthlyMap[key]) };
+    }),
+    categorySpending: toSortedSeries_(categoryMap, function(key) { return key; }),
+    cardSpending: toSortedSeries_(cardMap, function(key) { return cardNameMap[key] ? cardNameMap[key].cardName : key; }),
+    merchantUsage: toSortedSeries_(merchantMap, function(key) { return key; }).slice(0, 6),
+    topTransactions: transactions.slice().sort(function(a, b) { return b.amount - a.amount; }).slice(0, 10),
+    utilizationByCard: cards.map(function(card) {
+      return { label: card.cardName, value: card.utilization };
+    }).sort(function(a, b) {
+      return b.value - a.value;
+    }),
   };
 }
 
 function buildAlerts_(cards, installments, settings) {
   const alerts = [];
-  const statementNoticeDays = parseNoticeDays_(settings.statementNoticeDays || '7,3,1');
-  const paymentNoticeDays = parseNoticeDays_(settings.paymentNoticeDays || '7,3,1');
+  const statementNoticeDays = parseNumberList_(settings.statementNoticeDays || '7,3,1');
+  const paymentNoticeDays = parseNumberList_(settings.paymentNoticeDays || '7,3,1');
 
   cards.filter(function(card) { return card.isActive; }).forEach(function(card) {
     if (card.utilization >= 90) {
-      alerts.push(createAlert_('utilization', 'critical', card.id, 'Card near limit', card.cardName + ' utilization is at ' + card.utilization + '%. Consider paying down the balance.'));
+      alerts.push(makeAlert_('utilization', 'critical', card.id, 'Card near limit', card.cardName + ' utilization is at ' + card.utilization + '%.'));
     } else if (card.utilization >= 80) {
-      alerts.push(createAlert_('utilization', 'high', card.id, 'High utilization', card.cardName + ' utilization is at ' + card.utilization + '%.'));
+      alerts.push(makeAlert_('utilization', 'high', card.id, 'High utilization', card.cardName + ' utilization is above 80%.'));
     } else if (card.utilization >= 70) {
-      alerts.push(createAlert_('utilization', 'medium', card.id, 'Utilization warning', card.cardName + ' utilization is above 70%.'));
+      alerts.push(makeAlert_('utilization', 'medium', card.id, 'Utilization warning', card.cardName + ' utilization is above 70%.'));
     } else if (card.utilization >= 50) {
-      alerts.push(createAlert_('utilization', 'low', card.id, 'Utilization heads-up', card.cardName + ' utilization is above 50%.'));
+      alerts.push(makeAlert_('utilization', 'low', card.id, 'Utilization heads-up', card.cardName + ' utilization is above 50%.'));
     }
 
     if (statementNoticeDays.indexOf(card.statementInDays) !== -1) {
-      alerts.push(createAlert_('statement', 'medium', card.id, 'Statement date is coming up', card.cardName + ' statement date is in ' + card.statementInDays + ' day(s).'));
+      alerts.push(makeAlert_('statement', 'medium', card.id, 'Statement date is coming up', card.cardName + ' statement date is in ' + card.statementInDays + ' day(s).'));
     }
 
     if (paymentNoticeDays.indexOf(card.paymentDueInDays) !== -1) {
-      const severity = card.paymentDueInDays <= 1 ? 'critical' : card.paymentDueInDays <= 3 ? 'high' : 'medium';
-      alerts.push(createAlert_('payment', severity, card.id, 'Payment due soon', card.cardName + ' payment due date is in ' + card.paymentDueInDays + ' day(s).'));
+      alerts.push(makeAlert_('payment', card.paymentDueInDays <= 1 ? 'critical' : card.paymentDueInDays <= 3 ? 'high' : 'medium', card.id, 'Payment due soon', card.cardName + ' payment due date is in ' + card.paymentDueInDays + ' day(s).'));
     }
   });
 
-  installments.forEach(function(installment) {
-    if (installment.nextPaymentInDays <= 7) {
-      const severity = installment.nextPaymentInDays <= 3 ? 'high' : 'medium';
-      alerts.push(createAlert_('installment', severity, installment.cardId, 'Installment due soon', installment.productName + ' next installment is due in ' + installment.nextPaymentInDays + ' day(s).'));
+  installments.forEach(function(item) {
+    if (item.nextPaymentInDays <= 7) {
+      alerts.push(makeAlert_('installment', item.nextPaymentInDays <= 3 ? 'high' : 'medium', item.cardId, 'Installment due soon', item.productName + ' installment is due in ' + item.nextPaymentInDays + ' day(s).'));
     }
   });
 
@@ -595,8 +615,7 @@ function buildInsights_(cards, transactions, reports) {
   }
 
   if (reports.categorySpending.length > 0) {
-    const topCategory = reports.categorySpending[0];
-    insights.push(topCategory.label + ' is your top spending category right now.');
+    insights.push(reports.categorySpending[0].label + ' is your top spending category right now.');
   }
 
   const highUtilizationCard = cards.find(function(card) { return card.utilization >= 80; });
@@ -604,23 +623,22 @@ function buildInsights_(cards, transactions, reports) {
     insights.push(highUtilizationCard.cardName + ' is close to its limit and should be used carefully.');
   }
 
-  const recommendedCard = cards
-    .filter(function(card) { return card.isActive; })
-    .sort(function(a, b) {
-      return (a.utilization - b.utilization) || (b.availableCredit - a.availableCredit);
-    })[0];
+  const recommendedCard = cards.filter(function(card) { return card.isActive; }).sort(function(a, b) {
+    return (a.utilization - b.utilization) || (b.availableCredit - a.availableCredit);
+  })[0];
+
   if (recommendedCard) {
-    insights.push('Best card to use next is ' + recommendedCard.cardName + ' because it has the lowest utilization and strong available credit.');
+    insights.push('Best card to use next is ' + recommendedCard.cardName + ' because it has low utilization and strong available credit.');
   }
 
   if (transactions.length === 0) {
-    insights.push('No transactions yet. Add one to start seeing smarter insights.');
+    insights.push('No transactions yet. Add one to start seeing smart insights.');
   }
 
   return insights.slice(0, 4);
 }
 
-function buildSimulatorResult_(cards, amount) {
+function buildSimulator_(cards, amount) {
   if (amount <= 0) {
     return {
       amount: 0,
@@ -629,40 +647,53 @@ function buildSimulatorResult_(cards, amount) {
     };
   }
 
-  const results = cards
-    .filter(function(card) { return card.isActive; })
-    .map(function(card) {
-      const newBalance = round2_(card.currentBalance + amount);
-      const newAvailableCredit = round2_(Math.max(card.creditLimit - newBalance, 0));
-      const newUtilization = card.creditLimit > 0 ? round2_((newBalance / card.creditLimit) * 100) : 0;
-      return {
-        id: card.id,
-        cardName: card.cardName,
-        canUse: newBalance <= card.creditLimit,
-        newBalance: newBalance,
-        newAvailableCredit: newAvailableCredit,
-        newUtilization: newUtilization,
-      };
-    })
-    .sort(function(a, b) {
-      if (a.canUse !== b.canUse) {
-        return a.canUse ? -1 : 1;
-      }
-      return a.newUtilization - b.newUtilization;
-    });
+  const rows = cards.filter(function(card) { return card.isActive; }).map(function(card) {
+    const newBalance = round2_(card.currentBalance + amount);
+    const newAvailableCredit = round2_(Math.max(card.creditLimit - newBalance, 0));
+    const newUtilization = card.creditLimit > 0 ? round2_((newBalance / card.creditLimit) * 100) : 0;
 
-  const bestCard = results.find(function(card) { return card.canUse; });
+    return {
+      id: card.id,
+      cardName: card.cardName,
+      canUse: newBalance <= card.creditLimit,
+      newBalance: newBalance,
+      newAvailableCredit: newAvailableCredit,
+      newUtilization: newUtilization,
+    };
+  }).sort(function(a, b) {
+    if (a.canUse !== b.canUse) {
+      return a.canUse ? -1 : 1;
+    }
+    return a.newUtilization - b.newUtilization;
+  });
+
+  const bestCard = rows.find(function(item) { return item.canUse; });
   return {
     amount: amount,
     recommendation: bestCard ? 'Recommended card: ' + bestCard.cardName : 'No card can cover this purchase safely.',
-    cards: results,
+    cards: rows,
   };
+}
+
+function syncAlertsForSpreadsheet_(spreadsheet) {
+  const cards = buildCardSummaries_(
+    readSheetObjects_(spreadsheet.getSheetByName('Cards')),
+    readSheetObjects_(spreadsheet.getSheetByName('Transactions')),
+    readSheetObjects_(spreadsheet.getSheetByName('Payments'))
+  );
+  const installments = buildInstallments_(
+    readSheetObjects_(spreadsheet.getSheetByName('Installments')),
+    toMapById_(cards)
+  );
+  const settings = readSettings_(spreadsheet.getSheetByName('Settings'));
+  syncAlertsSheet_(spreadsheet, buildAlerts_(cards, installments, settings));
 }
 
 function syncAlertsSheet_(spreadsheet, alerts) {
   const sheet = spreadsheet.getSheetByName('Alerts');
-  sheet.clearContents();
   const headers = SHEET_DEFINITIONS.Alerts;
+
+  sheet.clearContents();
   sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
   sheet.setFrozenRows(1);
 
@@ -686,7 +717,134 @@ function syncAlertsSheet_(spreadsheet, alerts) {
   sheet.getRange(2, 1, rows.length, rows[0].length).setValues(rows);
 }
 
-function createAlert_(type, severity, cardId, title, message) {
+function buildSystemStatus_(spreadsheet) {
+  if (!spreadsheet) {
+    return {
+      projectName: PROJECT_NAME,
+      connected: false,
+      spreadsheetFound: false,
+      spreadsheetId: '',
+      spreadsheetUrl: '',
+      spreadsheetName: '',
+      message: 'No project spreadsheet connected yet. Run setupProject first.',
+      sheetStatus: Object.keys(SHEET_DEFINITIONS).map(function(name) {
+        return { name: name, exists: false, rowCount: 0, hasHeaders: false };
+      }),
+      missingSheets: Object.keys(SHEET_DEFINITIONS),
+    };
+  }
+
+  const sheetStatus = Object.keys(SHEET_DEFINITIONS).map(function(name) {
+    const sheet = spreadsheet.getSheetByName(name);
+    return {
+      name: name,
+      exists: !!sheet,
+      rowCount: sheet ? Math.max(sheet.getLastRow() - 1, 0) : 0,
+      hasHeaders: sheet ? sheet.getLastRow() >= 1 : false,
+    };
+  });
+
+  const missingSheets = sheetStatus.filter(function(item) {
+    return !item.exists;
+  }).map(function(item) {
+    return item.name;
+  });
+
+  return {
+    projectName: PROJECT_NAME,
+    connected: true,
+    spreadsheetFound: true,
+    spreadsheetId: spreadsheet.getId(),
+    spreadsheetUrl: spreadsheet.getUrl(),
+    spreadsheetName: spreadsheet.getName(),
+    message: missingSheets.length ? 'Some sheets are missing.' : 'Spreadsheet connection is healthy.',
+    sheetStatus: sheetStatus,
+    missingSheets: missingSheets,
+  };
+}
+
+function readSheetObjects_(sheet) {
+  if (!sheet) {
+    return [];
+  }
+
+  const values = sheet.getDataRange().getValues();
+  if (values.length <= 1) {
+    return [];
+  }
+
+  const headers = values[0];
+  return values.slice(1).filter(function(row) {
+    return row.join('').toString().trim() !== '';
+  }).map(function(row) {
+    const item = {};
+    headers.forEach(function(header, index) {
+      item[header] = row[index];
+    });
+    return item;
+  });
+}
+
+function readSettings_(sheet) {
+  return readSheetObjects_(sheet).reduce(function(map, row) {
+    map[sanitizeText_(row.key)] = sanitizeText_(row.value);
+    return map;
+  }, {});
+}
+
+function sheetHeadersMatch_(sheet, headers) {
+  if (!sheet || sheet.getLastRow() === 0) {
+    return false;
+  }
+
+  const currentHeaders = sheet.getRange(1, 1, 1, headers.length).getValues()[0];
+  return currentHeaders.join('|') === headers.join('|');
+}
+
+function appendObjectRow_(sheet, objectRow) {
+  const headers = SHEET_DEFINITIONS[sheet.getName()];
+  const row = headers.map(function(header) {
+    return objectRow[header];
+  });
+
+  const nextRow = sheet.getLastRow() + 1;
+  sheet.getRange(nextRow, 1, 1, row.length).setValues([row]);
+}
+
+function upsertObjectById_(sheet, objectRow) {
+  const headers = SHEET_DEFINITIONS[sheet.getName()];
+  const values = sheet.getDataRange().getValues();
+  const idIndex = headers.indexOf('id');
+  const row = headers.map(function(header) {
+    return objectRow[header];
+  });
+
+  for (let i = 1; i < values.length; i += 1) {
+    if (values[i][idIndex] === objectRow.id) {
+      sheet.getRange(i + 1, 1, 1, row.length).setValues([row]);
+      return;
+    }
+  }
+
+  sheet.getRange(sheet.getLastRow() + 1, 1, 1, row.length).setValues([row]);
+}
+
+function toMapById_(rows) {
+  return rows.reduce(function(map, row) {
+    map[row.id] = row;
+    return map;
+  }, {});
+}
+
+function sumByCard_(rows, cardId) {
+  return round2_(rows.filter(function(row) {
+    return sanitizeText_(row.cardId) === sanitizeText_(cardId);
+  }).reduce(function(sum, row) {
+    return sum + parseNumber_(row.amount);
+  }, 0));
+}
+
+function makeAlert_(type, severity, cardId, title, message) {
   return {
     id: createId_('ALT'),
     type: type,
@@ -699,183 +857,45 @@ function createAlert_(type, severity, cardId, title, message) {
   };
 }
 
-function ensureDemoData_(spreadsheet) {
-  return seedIfEmpty_(spreadsheet);
-}
-
-function seedSheetIfEmpty_(sheet, rows) {
-  if (!sheet || !rows || !rows.length) {
-    return false;
-  }
-
-  if (sheet.getLastRow() > 1) {
-    return false;
-  }
-
-  sheet.getRange(2, 1, rows.length, rows[0].length).setValues(rows);
-  return true;
-}
-
-function buildSystemStatus_(spreadsheet) {
-  if (!spreadsheet) {
-    return {
-      projectName: PROJECT_NAME,
-      connected: false,
-      spreadsheetFound: false,
-      message: 'No project spreadsheet is connected yet. Run setup to create one.',
-      sheetStatus: [],
-      missingSheets: Object.keys(SHEET_DEFINITIONS),
-    };
-  }
-
-  const sheetStatus = Object.keys(SHEET_DEFINITIONS).map(function(sheetName) {
-    const sheet = spreadsheet.getSheetByName(sheetName);
-    const rowCount = sheet ? Math.max(sheet.getLastRow() - 1, 0) : 0;
-    return {
-      name: sheetName,
-      exists: !!sheet,
-      rowCount: rowCount,
-      hasHeaders: !!sheet && sheet.getLastRow() >= 1,
-    };
-  });
-
-  const missingSheets = sheetStatus
-    .filter(function(item) { return !item.exists; })
-    .map(function(item) { return item.name; });
-
-  return {
-    projectName: PROJECT_NAME,
-    connected: true,
-    spreadsheetFound: true,
-    spreadsheetId: spreadsheet.getId(),
-    spreadsheetUrl: spreadsheet.getUrl(),
-    spreadsheetName: spreadsheet.getName(),
-    message: missingSheets.length ? 'Some sheets are still missing and need repair.' : 'Spreadsheet connection is healthy.',
-    sheetStatus: sheetStatus,
-    missingSheets: missingSheets,
-  };
-}
-
-function runSetupCore_() {
-  const steps = [];
-  const spreadsheet = ensureProjectSpreadsheet_();
-  steps.push('spreadsheet-ready');
-
-  const sheetReport = initializeSheets_(spreadsheet);
-  steps.push('sheets-initialized');
-
-  ensureDemoData_(spreadsheet);
-  steps.push('demo-data-ensured');
-
-  return {
-    spreadsheet: spreadsheet,
-    steps: steps,
-    sheetReport: sheetReport,
-  };
-}
-
-function getSheetObjects_(sheet) {
-  const values = sheet.getDataRange().getValues();
-  if (values.length <= 1) {
-    return [];
-  }
-
-  const headers = values[0];
-  return values.slice(1)
-    .filter(function(row) {
-      return row.join('').toString().trim() !== '';
-    })
-    .map(function(row) {
-      const item = {};
-      headers.forEach(function(header, index) {
-        item[header] = row[index];
-      });
-      return item;
-    });
-}
-
-function getSettingsMap_(sheet) {
-  return getSheetObjects_(sheet).reduce(function(map, row) {
-    map[row.key] = row.value;
-    return map;
-  }, {});
-}
-
-function appendObjectRow_(sheet, rowObject) {
-  const headers = SHEET_DEFINITIONS[sheet.getName()];
-  const row = headers.map(function(header) {
-    return rowObject[header];
-  });
-  sheet.appendRow(row);
-}
-
-function upsertRowById_(sheet, id, rowObject) {
-  const values = sheet.getDataRange().getValues();
-  const headers = values[0];
-  const idColumnIndex = headers.indexOf('id');
-  const targetRow = headers.map(function(header) {
-    return rowObject[header];
-  });
-
-  for (let rowIndex = 1; rowIndex < values.length; rowIndex += 1) {
-    if (values[rowIndex][idColumnIndex] === id) {
-      sheet.getRange(rowIndex + 1, 1, 1, targetRow.length).setValues([targetRow]);
-      return;
-    }
-  }
-
-  sheet.appendRow(targetRow);
-}
-
 function createId_(prefix) {
   return prefix + '-' + Utilities.getUuid().slice(0, 8).toUpperCase();
 }
 
-function createSampleDate_(offsetDays) {
+function daysAgo_(days) {
   const date = new Date();
-  date.setDate(date.getDate() + offsetDays);
+  date.setDate(date.getDate() - days);
   return formatDateKey_(date);
 }
 
-function daysAgo_(days) {
-  return createSampleDate_(0 - days);
-}
-
 function daysFromToday_(days) {
-  return createSampleDate_(days);
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  return formatDateKey_(date);
 }
 
-function parseNoticeDays_(value) {
-  return sanitizeText_(value)
-    .split(',')
-    .map(function(item) { return parseInt(item, 10); })
-    .filter(function(item) { return !isNaN(item); });
-}
-
-function nextMonthlyDate_(dayOfMonth) {
-  const safeDay = Math.min(Math.max(parseInt(dayOfMonth, 10) || 1, 1), 28);
-  const now = new Date();
-  let target = new Date(now.getFullYear(), now.getMonth(), safeDay);
-  if (target < stripTime_(now)) {
-    target = new Date(now.getFullYear(), now.getMonth() + 1, safeDay);
+function normalizeDateText_(value) {
+  const text = sanitizeText_(value);
+  if (!text) {
+    return '';
   }
-  return target;
+  return formatDateKey_(toDate_(text));
+}
+
+function nextMonthlyDate_(dayValue) {
+  const day = normalizeDay_(dayValue);
+  const today = stripTime_(new Date());
+  let date = new Date(today.getFullYear(), today.getMonth(), day);
+
+  if (date.getTime() < today.getTime()) {
+    date = new Date(today.getFullYear(), today.getMonth() + 1, day);
+  }
+
+  return date;
 }
 
 function daysBetweenToday_(date) {
   const oneDay = 24 * 60 * 60 * 1000;
-  const today = stripTime_(new Date());
-  const target = stripTime_(date);
-  return Math.round((target.getTime() - today.getTime()) / oneDay);
-}
-
-function stripTime_(date) {
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
-}
-
-function normalizeDateString_(value) {
-  const date = toDate_(value);
-  return formatDateKey_(date);
+  return Math.round((stripTime_(date).getTime() - stripTime_(new Date()).getTime()) / oneDay);
 }
 
 function toDate_(value) {
@@ -883,15 +903,34 @@ function toDate_(value) {
     return value;
   }
 
-  if (typeof value === 'string' && value) {
-    return new Date(value);
+  const text = sanitizeText_(value);
+  if (!text) {
+    return new Date();
   }
 
-  return new Date();
+  const parsed = new Date(text);
+  return isNaN(parsed.getTime()) ? new Date() : parsed;
+}
+
+function stripTime_(date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
 }
 
 function formatDateKey_(date) {
   return Utilities.formatDate(date, APP_TIMEZONE, 'yyyy-MM-dd');
+}
+
+function parseNumberList_(value) {
+  return sanitizeText_(value).split(',').map(function(item) {
+    return parseInteger_(item);
+  }).filter(function(item) {
+    return !isNaN(item);
+  });
+}
+
+function parseInteger_(value) {
+  const number = parseInt(value, 10);
+  return isNaN(number) ? 0 : number;
 }
 
 function parseNumber_(value) {
@@ -908,7 +947,13 @@ function sanitizeText_(value) {
 }
 
 function normalizeBoolean_(value) {
-  return value === true || String(value).toLowerCase() === 'true' || String(value) === '1';
+  const text = String(value).toLowerCase();
+  return value === true || text === 'true' || text === '1';
+}
+
+function normalizeDay_(value) {
+  const day = parseInteger_(value) || 1;
+  return Math.max(1, Math.min(day, 28));
 }
 
 function utilizationColor_(utilization) {
@@ -934,13 +979,14 @@ function severityScore_(severity) {
 }
 
 function toSortedSeries_(map, labelResolver) {
-  return Object.keys(map)
-    .map(function(key) {
-      return { label: labelResolver(key), value: round2_(map[key]) };
-    })
-    .sort(function(a, b) {
-      return b.value - a.value;
-    });
+  return Object.keys(map).map(function(key) {
+    return {
+      label: labelResolver(key),
+      value: round2_(map[key]),
+    };
+  }).sort(function(a, b) {
+    return b.value - a.value;
+  });
 }
 
 function sortByDateDesc_(a, b) {
