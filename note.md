@@ -29,3 +29,9 @@
 - ปัญหา: โฟลเดอร์งานเดิมยังไม่ใช่ git repo และ remote ปลายทางเป็น empty repository จึงต้องตั้ง repo ใหม่ให้ระวัง scope ของไฟล์ที่จะ push
 - แก้อย่างไร: stage เฉพาะไฟล์งานส่งมอบหลัก ไม่เอา `Design`, `backup`, `prompt.txt` หรือไฟล์อื่นที่ไม่ใช่ตัว MVP ขึ้นไป, แล้ว push commit `84cb460`
 - ทำต่อ: ถัดไปให้เปิด repo บน GitHub หรือดึงไฟล์ไปลง Apps Script เพื่อทดสอบ `setupProject` และ Web App จริง จากนั้นค่อยแก้บั๊กและ push รอบต่อไป
+
+## 2026-06-01 11:22:38
+- ทำอะไรไป: ตรวจลิงก์ Web App `https://script.google.com/macros/s/AKfycbwhMGjGgPmnnU4XTpMzEtF-58-wu1l8ExIGnzAJTZiQRytXjKssE9jR1J-f2IkKPHccnw/exec` และเช็กช่องทางอัปเดตผ่าน browser / terminal เพิ่ม
+- ปัญหา: ตัว deploy ปัจจุบัน error ว่า `No HTML file named index was found. (line 15, file "รหัส")` แปลว่าฝั่ง Apps Script ที่ deploy อยู่ยังไม่มีไฟล์ `index` ตามที่ `doGet()` เรียกใช้ หรือยังไม่ได้อัปเดตโค้ดล่าสุดขึ้นไป และเครื่องนี้ยังไม่มี `clasp`/การเชื่อม Chrome session สำหรับเข้าไปแก้โปรเจ็กต์ Apps Script ตรง ๆ
+- แก้อย่างไร: ยืนยันว่าโค้ดล่าสุดใน Main Project และบน GitHub มี `index.html` + `code.gs` ครบแล้ว ปัญหาหลักอยู่ที่ฝั่ง Apps Script project/deployment ไม่ใช่ไฟล์ใน repo
+- ทำต่อ: ต้องเข้าถึง Apps Script editor ของโปรเจ็กต์นั้นก่อน แล้วค่อยอัปโหลด `index.html`, `code.gs`, `appsscript.json` และ redeploy Web App ใหม่
