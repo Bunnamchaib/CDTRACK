@@ -1,0 +1,1571 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cradit Tracking</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+      :root {
+        --background: #09090b;
+        --surface-lowest: #09090b;
+        --surface-low: #0f0f12;
+        --surface: #121215;
+        --surface-high: #18181b;
+        --surface-highest: #1e1e22;
+        --outline: #27272a;
+        --outline-strong: #52525b;
+        --text: #fafafa;
+        --text-muted: #a1a1aa;
+        --primary: #a78bfa;
+        --primary-strong: #7c3aed;
+        --emerald: #34d399;
+        --amber: #f59e0b;
+        --orange: #f97316;
+        --red: #ef4444;
+        --shadow: 0 16px 40px rgba(0, 0, 0, 0.28);
+        --radius: 18px;
+        --radius-sm: 12px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html, body {
+        margin: 0;
+        min-height: 100%;
+        background:
+          radial-gradient(circle at top right, rgba(167, 139, 250, 0.16), transparent 28%),
+          radial-gradient(circle at bottom left, rgba(52, 211, 153, 0.08), transparent 24%),
+          var(--background);
+        color: var(--text);
+        font-family: 'Geist', sans-serif;
+      }
+
+      body {
+        display: flex;
+        justify-content: center;
+      }
+
+      a {
+        color: var(--primary);
+        text-decoration: none;
+      }
+
+      button, input, select, textarea {
+        font: inherit;
+      }
+
+      .app-shell {
+        width: min(1440px, 100%);
+        min-height: 100vh;
+        display: grid;
+        grid-template-columns: 280px minmax(0, 1fr);
+      }
+
+      .sidebar {
+        padding: 28px 20px;
+        border-right: 1px solid var(--outline);
+        background: rgba(9, 9, 11, 0.86);
+        backdrop-filter: blur(16px);
+        position: sticky;
+        top: 0;
+        height: 100vh;
+      }
+
+      .brand {
+        padding: 18px;
+        border: 1px solid var(--outline);
+        border-radius: var(--radius);
+        background: linear-gradient(180deg, rgba(167, 139, 250, 0.12), rgba(18, 18, 21, 0.96));
+        box-shadow: var(--shadow);
+      }
+
+      .brand h1 {
+        margin: 0;
+        font-size: 1.2rem;
+        letter-spacing: -0.02em;
+      }
+
+      .brand p {
+        margin: 10px 0 0;
+        color: var(--text-muted);
+        line-height: 1.5;
+        font-size: 0.92rem;
+      }
+
+      .nav-list {
+        display: grid;
+        gap: 10px;
+        margin-top: 28px;
+      }
+
+      .nav-button {
+        width: 100%;
+        border: 1px solid var(--outline);
+        background: var(--surface-low);
+        color: var(--text);
+        border-radius: 16px;
+        padding: 14px 16px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        cursor: pointer;
+        transition: 0.2s ease;
+      }
+
+      .nav-button:hover,
+      .nav-button.active {
+        border-color: rgba(167, 139, 250, 0.65);
+        background: rgba(167, 139, 250, 0.12);
+      }
+
+      .icon {
+        font-family: 'Material Symbols Outlined';
+        font-size: 1.3rem;
+        font-variation-settings: 'FILL' 1, 'wght' 500, 'opsz' 24;
+      }
+
+      .sidebar-footer {
+        margin-top: 28px;
+        padding: 18px;
+        border-radius: var(--radius);
+        border: 1px solid var(--outline);
+        background: var(--surface-low);
+      }
+
+      .sidebar-footer p {
+        margin: 8px 0 0;
+        color: var(--text-muted);
+        font-size: 0.9rem;
+        line-height: 1.5;
+      }
+
+      .content {
+        padding: 28px 28px 110px;
+      }
+
+      .topbar {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        align-items: flex-start;
+        margin-bottom: 26px;
+      }
+
+      .title-wrap h2 {
+        margin: 0;
+        font-size: clamp(1.8rem, 3vw, 2.4rem);
+        letter-spacing: -0.03em;
+      }
+
+      .title-wrap p {
+        margin: 10px 0 0;
+        color: var(--text-muted);
+      }
+
+      .toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        justify-content: flex-end;
+      }
+
+      .button {
+        border: 1px solid var(--outline);
+        background: var(--surface-high);
+        color: var(--text);
+        padding: 12px 16px;
+        border-radius: 14px;
+        cursor: pointer;
+        transition: 0.2s ease;
+      }
+
+      .button:hover {
+        border-color: var(--primary);
+      }
+
+      .button.primary {
+        background: linear-gradient(135deg, rgba(167, 139, 250, 0.92), rgba(124, 58, 237, 0.92));
+        border-color: rgba(167, 139, 250, 0.6);
+        color: #140721;
+        font-weight: 700;
+      }
+
+      .button.ghost {
+        background: transparent;
+      }
+
+      .grid {
+        display: grid;
+        gap: 18px;
+      }
+
+      .stats-grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+
+      .two-column {
+        grid-template-columns: minmax(0, 1.45fr) minmax(320px, 0.95fr);
+      }
+
+      .cards-layout {
+        grid-template-columns: minmax(0, 1.2fr) minmax(340px, 0.8fr);
+      }
+
+      .reports-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .panel {
+        border: 1px solid var(--outline);
+        background: linear-gradient(180deg, rgba(24, 24, 27, 0.94), rgba(12, 12, 15, 0.96));
+        border-radius: var(--radius);
+        padding: 20px;
+        box-shadow: var(--shadow);
+      }
+
+      .panel h3,
+      .panel h4 {
+        margin: 0;
+        letter-spacing: -0.02em;
+      }
+
+      .panel-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 18px;
+      }
+
+      .panel-subtext {
+        color: var(--text-muted);
+        font-size: 0.92rem;
+        margin-top: 8px;
+      }
+
+      .stat-card {
+        position: relative;
+        overflow: hidden;
+      }
+
+      .stat-card::after {
+        content: '';
+        position: absolute;
+        inset: auto -30% -50% auto;
+        width: 160px;
+        height: 160px;
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(167, 139, 250, 0.18), transparent 66%);
+      }
+
+      .eyebrow {
+        color: var(--text-muted);
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+
+      .stat-value {
+        margin-top: 12px;
+        font-size: 1.9rem;
+        font-weight: 700;
+        letter-spacing: -0.04em;
+      }
+
+      .stat-foot {
+        margin-top: 10px;
+        color: var(--text-muted);
+        font-size: 0.92rem;
+      }
+
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        border-radius: 999px;
+        padding: 6px 10px;
+        background: rgba(167, 139, 250, 0.12);
+        color: var(--primary);
+        font-size: 0.85rem;
+        border: 1px solid rgba(167, 139, 250, 0.22);
+      }
+
+      .card-carousel {
+        display: grid;
+        gap: 14px;
+      }
+
+      .credit-card {
+        border: 1px solid var(--outline);
+        border-radius: var(--radius);
+        padding: 18px;
+        background:
+          linear-gradient(145deg, rgba(255, 255, 255, 0.02), transparent 30%),
+          var(--surface-low);
+      }
+
+      .credit-card-top,
+      .list-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: center;
+      }
+
+      .credit-card-title {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+      }
+
+      .color-chip {
+        width: 14px;
+        height: 14px;
+        border-radius: 999px;
+        box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.04);
+      }
+
+      .credit-card h4 {
+        font-size: 1.05rem;
+      }
+
+      .muted {
+        color: var(--text-muted);
+      }
+
+      .metric-pair {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+        margin-top: 18px;
+      }
+
+      .metric-pair div {
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid rgba(255, 255, 255, 0.04);
+        border-radius: 14px;
+        padding: 12px;
+      }
+
+      .meter {
+        height: 10px;
+        border-radius: 999px;
+        background: #151519;
+        border: 1px solid var(--outline);
+        overflow: hidden;
+        margin-top: 14px;
+      }
+
+      .meter-fill {
+        height: 100%;
+        border-radius: inherit;
+      }
+
+      .simple-list {
+        display: grid;
+        gap: 12px;
+      }
+
+      .simple-item {
+        padding: 14px;
+        border-radius: 14px;
+        border: 1px solid var(--outline);
+        background: rgba(255, 255, 255, 0.02);
+      }
+
+      .severity-low { border-left: 4px solid var(--amber); }
+      .severity-medium { border-left: 4px solid var(--primary); }
+      .severity-high { border-left: 4px solid var(--orange); }
+      .severity-critical { border-left: 4px solid var(--red); }
+
+      .form-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+      }
+
+      .field {
+        display: grid;
+        gap: 8px;
+      }
+
+      .field.full {
+        grid-column: 1 / -1;
+      }
+
+      label {
+        color: var(--text-muted);
+        font-size: 0.92rem;
+      }
+
+      input, select, textarea {
+        width: 100%;
+        border-radius: 14px;
+        border: 1px solid var(--outline);
+        background: var(--surface-lowest);
+        color: var(--text);
+        padding: 12px 14px;
+        outline: none;
+      }
+
+      textarea {
+        min-height: 108px;
+        resize: vertical;
+      }
+
+      input:focus, select:focus, textarea:focus {
+        border-color: rgba(167, 139, 250, 0.72);
+        box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.16);
+      }
+
+      .form-actions {
+        display: flex;
+        gap: 12px;
+        margin-top: 16px;
+      }
+
+      .mini-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 12px;
+      }
+
+      .pill {
+        padding: 6px 10px;
+        border-radius: 999px;
+        border: 1px solid var(--outline);
+        color: var(--text-muted);
+        font-size: 0.82rem;
+        background: rgba(255, 255, 255, 0.02);
+      }
+
+      .bar-list {
+        display: grid;
+        gap: 12px;
+      }
+
+      .bar-row {
+        display: grid;
+        gap: 8px;
+      }
+
+      .bar-row-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        color: var(--text-muted);
+        font-size: 0.92rem;
+      }
+
+      .bar-track {
+        height: 12px;
+        border-radius: 999px;
+        background: #111216;
+        border: 1px solid var(--outline);
+        overflow: hidden;
+      }
+
+      .bar-fill {
+        height: 100%;
+        border-radius: inherit;
+        background: linear-gradient(90deg, rgba(167, 139, 250, 0.86), rgba(52, 211, 153, 0.76));
+      }
+
+      .table-like {
+        display: grid;
+        gap: 10px;
+      }
+
+      .table-row {
+        display: grid;
+        grid-template-columns: 1.15fr 0.8fr 0.7fr;
+        gap: 12px;
+        align-items: center;
+        padding: 12px 14px;
+        border-radius: 14px;
+        border: 1px solid var(--outline);
+        background: rgba(255, 255, 255, 0.02);
+      }
+
+      .empty-state {
+        padding: 30px 18px;
+        text-align: center;
+        color: var(--text-muted);
+        border-radius: var(--radius);
+        border: 1px dashed var(--outline-strong);
+        background: rgba(255, 255, 255, 0.02);
+      }
+
+      .hidden {
+        display: none !important;
+      }
+
+      .toast {
+        position: fixed;
+        right: 24px;
+        bottom: 92px;
+        max-width: 360px;
+        padding: 14px 16px;
+        border-radius: 14px;
+        border: 1px solid var(--outline);
+        background: rgba(12, 12, 15, 0.94);
+        box-shadow: var(--shadow);
+        color: var(--text);
+        opacity: 0;
+        transform: translateY(12px);
+        pointer-events: none;
+        transition: 0.24s ease;
+      }
+
+      .toast.show {
+        opacity: 1;
+        transform: translateY(0);
+      }
+
+      .loading {
+        position: fixed;
+        inset: 0;
+        background: rgba(9, 9, 11, 0.72);
+        backdrop-filter: blur(4px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 20;
+      }
+
+      .loading-card {
+        min-width: 260px;
+        padding: 22px;
+        border-radius: var(--radius);
+        border: 1px solid var(--outline);
+        background: var(--surface);
+        text-align: center;
+      }
+
+      .spinner {
+        width: 42px;
+        height: 42px;
+        border-radius: 50%;
+        border: 3px solid rgba(167, 139, 250, 0.22);
+        border-top-color: var(--primary);
+        margin: 0 auto 14px;
+        animation: spin 0.9s linear infinite;
+      }
+
+      .mobile-nav {
+        display: none;
+      }
+
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+
+      @media (max-width: 1120px) {
+        .stats-grid,
+        .two-column,
+        .cards-layout,
+        .reports-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media (max-width: 920px) {
+        .app-shell {
+          grid-template-columns: 1fr;
+        }
+
+        .sidebar {
+          display: none;
+        }
+
+        .content {
+          padding: 22px 18px 120px;
+        }
+
+        .mobile-nav {
+          position: fixed;
+          left: 12px;
+          right: 12px;
+          bottom: 12px;
+          display: grid;
+          grid-template-columns: repeat(5, minmax(0, 1fr));
+          gap: 10px;
+          padding: 10px;
+          border-radius: 24px;
+          background: rgba(9, 9, 11, 0.94);
+          border: 1px solid var(--outline);
+          box-shadow: var(--shadow);
+          z-index: 15;
+        }
+
+        .mobile-nav .nav-button {
+          padding: 12px 10px;
+          flex-direction: column;
+          gap: 6px;
+          font-size: 0.75rem;
+          border-radius: 18px;
+        }
+
+        .topbar {
+          flex-direction: column;
+        }
+
+        .toolbar {
+          width: 100%;
+          justify-content: flex-start;
+        }
+
+        .form-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .table-row {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="badge">Precision in Darkness</div>
+          <h1>Cradit Tracking</h1>
+          <p>Google Apps Script web app for cards, spending, reports, and rule-based credit alerts.</p>
+        </div>
+
+        <nav class="nav-list" id="desktopNav"></nav>
+
+        <div class="sidebar-footer">
+          <strong>Data mode</strong>
+          <p id="sidebarMeta">Run setup once to create the Sheets tables and seed demo data for this project.</p>
+        </div>
+      </aside>
+
+      <main class="content">
+        <div class="topbar">
+          <div class="title-wrap">
+            <h2 id="pageTitle">Dashboard</h2>
+            <p id="pageSubtitle">Inspect balances, utilization, alerts, and recent activity.</p>
+          </div>
+
+          <div class="toolbar">
+            <a class="button ghost hidden" id="sheetLink" target="_blank" rel="noopener noreferrer">Open spreadsheet</a>
+            <button class="button" id="refreshButton" type="button">Refresh data</button>
+            <button class="button primary" id="setupButton" type="button">Setup sheets + demo data</button>
+          </div>
+        </div>
+
+        <section id="setupState" class="panel hidden">
+          <div class="panel-header">
+            <div>
+              <h3>Project setup required</h3>
+              <div class="panel-subtext">Create the spreadsheet tables and load dummy data before using the app.</div>
+            </div>
+          </div>
+          <div class="empty-state">
+            Tap <strong>Setup sheets + demo data</strong> to create the `Cards`, `Transactions`, `Payments`, `Installments`, `Alerts`, and `Settings` sheets automatically.
+          </div>
+        </section>
+
+        <section id="appState" class="hidden">
+          <div id="dashboardSection" class="view-section">
+            <div class="grid stats-grid" id="statsGrid"></div>
+
+            <div class="grid two-column" style="margin-top:18px;">
+              <div class="panel">
+                <div class="panel-header">
+                  <div>
+                    <h3>Credit overview</h3>
+                    <div class="panel-subtext">Live utilization and available credit by card.</div>
+                  </div>
+                </div>
+                <div class="card-carousel" id="dashboardCards"></div>
+              </div>
+
+              <div class="grid">
+                <div class="panel">
+                  <div class="panel-header">
+                    <div>
+                      <h3>Smart alerts</h3>
+                      <div class="panel-subtext">Rule-based warnings from utilization and due dates.</div>
+                    </div>
+                  </div>
+                  <div class="simple-list" id="alertsList"></div>
+                </div>
+
+                <div class="panel">
+                  <div class="panel-header">
+                    <div>
+                      <h3>AI insights placeholder</h3>
+                      <div class="panel-subtext">Rule-based suggestions without external AI APIs.</div>
+                    </div>
+                  </div>
+                  <div class="simple-list" id="insightsList"></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="grid two-column" style="margin-top:18px;">
+              <div class="panel">
+                <div class="panel-header">
+                  <div>
+                    <h3>Recent transactions</h3>
+                    <div class="panel-subtext">Latest activity across all active cards.</div>
+                  </div>
+                </div>
+                <div id="recentTransactions"></div>
+              </div>
+
+              <div class="panel">
+                <div class="panel-header">
+                  <div>
+                    <h3>Purchase simulator</h3>
+                    <div class="panel-subtext">Preview which card handles a new purchase best.</div>
+                  </div>
+                </div>
+                <form id="simulatorForm">
+                  <div class="field">
+                    <label for="simulatorAmount">Planned purchase amount</label>
+                    <input id="simulatorAmount" name="amount" type="number" min="0" step="0.01" placeholder="5000">
+                  </div>
+                  <div class="form-actions">
+                    <button class="button primary" type="submit">Run simulator</button>
+                  </div>
+                </form>
+                <div style="margin-top:16px;" id="simulatorResult"></div>
+              </div>
+            </div>
+          </div>
+
+          <div id="cardsSection" class="view-section hidden">
+            <div class="grid cards-layout">
+              <div class="panel">
+                <div class="panel-header">
+                  <div>
+                    <h3>Card portfolio</h3>
+                    <div class="panel-subtext">Manage card basics and monitor credit headroom.</div>
+                  </div>
+                </div>
+                <div class="card-carousel" id="cardsList"></div>
+              </div>
+
+              <div class="panel">
+                <div class="panel-header">
+                  <div>
+                    <h3 id="cardFormTitle">Add new card</h3>
+                    <div class="panel-subtext">Save card profile data without storing sensitive card numbers.</div>
+                  </div>
+                </div>
+                <form id="cardForm">
+                  <input id="cardId" name="id" type="hidden">
+                  <input id="cardCreatedAt" name="createdAt" type="hidden">
+                  <div class="form-grid">
+                    <div class="field">
+                      <label for="cardName">Card name</label>
+                      <input id="cardName" name="cardName" required>
+                    </div>
+                    <div class="field">
+                      <label for="bankName">Bank name</label>
+                      <input id="bankName" name="bankName" required>
+                    </div>
+                    <div class="field">
+                      <label for="creditLimit">Credit limit</label>
+                      <input id="creditLimit" name="creditLimit" type="number" min="0" step="0.01" required>
+                    </div>
+                    <div class="field">
+                      <label for="cardType">Card type</label>
+                      <input id="cardType" name="cardType" placeholder="Rewards / Travel / Cashback">
+                    </div>
+                    <div class="field">
+                      <label for="statementDay">Statement day</label>
+                      <input id="statementDay" name="statementDay" type="number" min="1" max="28" required>
+                    </div>
+                    <div class="field">
+                      <label for="paymentDueDay">Payment due day</label>
+                      <input id="paymentDueDay" name="paymentDueDay" type="number" min="1" max="28" required>
+                    </div>
+                    <div class="field">
+                      <label for="cardColor">Accent color</label>
+                      <input id="cardColor" name="cardColor" type="color" value="#a78bfa">
+                    </div>
+                    <div class="field">
+                      <label for="isActive">Status</label>
+                      <select id="isActive" name="isActive">
+                        <option value="true">Active</option>
+                        <option value="false">Archived</option>
+                      </select>
+                    </div>
+                    <div class="field full">
+                      <label for="cardNotes">Notes</label>
+                      <textarea id="cardNotes" name="notes" placeholder="Best use case, reminders, internal note..."></textarea>
+                    </div>
+                  </div>
+                  <div class="form-actions">
+                    <button class="button primary" type="submit">Save card</button>
+                    <button class="button" id="resetCardButton" type="button">Reset form</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+
+          <div id="addSection" class="view-section hidden">
+            <div class="grid two-column">
+              <div class="panel">
+                <div class="panel-header">
+                  <div>
+                    <h3>Add transaction</h3>
+                    <div class="panel-subtext">This updates card balance and dashboard utilization instantly.</div>
+                  </div>
+                </div>
+                <form id="transactionForm">
+                  <div class="form-grid">
+                    <div class="field">
+                      <label for="transactionCardId">Credit card</label>
+                      <select id="transactionCardId" name="cardId" required></select>
+                    </div>
+                    <div class="field">
+                      <label for="transactionDate">Date</label>
+                      <input id="transactionDate" name="date" type="date" required>
+                    </div>
+                    <div class="field">
+                      <label for="transactionAmount">Amount</label>
+                      <input id="transactionAmount" name="amount" type="number" min="0" step="0.01" required>
+                    </div>
+                    <div class="field">
+                      <label for="transactionMerchant">Merchant</label>
+                      <input id="transactionMerchant" name="merchant" required>
+                    </div>
+                    <div class="field">
+                      <label for="transactionCategory">Category</label>
+                      <select id="transactionCategory" name="category" required></select>
+                    </div>
+                    <div class="field full">
+                      <label for="transactionNotes">Notes</label>
+                      <textarea id="transactionNotes" name="notes" placeholder="Optional note about the transaction"></textarea>
+                    </div>
+                  </div>
+                  <div class="form-actions">
+                    <button class="button primary" type="submit">Save transaction</button>
+                  </div>
+                </form>
+              </div>
+
+              <div class="grid">
+                <div class="panel">
+                  <div class="panel-header">
+                    <div>
+                      <h3>Card quick balances</h3>
+                      <div class="panel-subtext">Choose the best card based on remaining credit.</div>
+                    </div>
+                  </div>
+                  <div class="card-carousel" id="quickCardBalances"></div>
+                </div>
+
+                <div class="panel">
+                  <div class="panel-header">
+                    <div>
+                      <h3>Latest entries</h3>
+                      <div class="panel-subtext">Recent transactions after setup or manual input.</div>
+                    </div>
+                  </div>
+                  <div id="latestEntries"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div id="reportsSection" class="view-section hidden">
+            <div class="grid reports-grid">
+              <div class="panel">
+                <div class="panel-header">
+                  <div>
+                    <h3>Monthly spending</h3>
+                    <div class="panel-subtext">Trend across the seeded transaction history.</div>
+                  </div>
+                </div>
+                <div id="monthlyChart"></div>
+              </div>
+
+              <div class="panel">
+                <div class="panel-header">
+                  <div>
+                    <h3>Spending by category</h3>
+                    <div class="panel-subtext">Category share for current demo data.</div>
+                  </div>
+                </div>
+                <div id="categoryChart"></div>
+              </div>
+
+              <div class="panel">
+                <div class="panel-header">
+                  <div>
+                    <h3>Spending by card</h3>
+                    <div class="panel-subtext">Which cards are carrying most of the spend.</div>
+                  </div>
+                </div>
+                <div id="cardChart"></div>
+              </div>
+
+              <div class="panel">
+                <div class="panel-header">
+                  <div>
+                    <h3>Utilization by card</h3>
+                    <div class="panel-subtext">Percent of credit limit currently in use.</div>
+                  </div>
+                </div>
+                <div id="utilizationChart"></div>
+              </div>
+            </div>
+
+            <div class="grid two-column" style="margin-top:18px;">
+              <div class="panel">
+                <div class="panel-header">
+                  <div>
+                    <h3>Top transactions</h3>
+                    <div class="panel-subtext">Largest spending items in the current dataset.</div>
+                  </div>
+                </div>
+                <div id="topTransactions"></div>
+              </div>
+
+              <div class="panel">
+                <div class="panel-header">
+                  <div>
+                    <h3>Most used merchants</h3>
+                    <div class="panel-subtext">Merchant totals aggregated from transactions.</div>
+                  </div>
+                </div>
+                <div id="merchantChart"></div>
+              </div>
+            </div>
+          </div>
+
+          <div id="settingsSection" class="view-section hidden">
+            <div class="grid two-column">
+              <div class="panel">
+                <div class="panel-header">
+                  <div>
+                    <h3>Project settings</h3>
+                    <div class="panel-subtext">Simple placeholders kept inside the `Settings` sheet.</div>
+                  </div>
+                </div>
+                <div class="simple-list" id="settingsList"></div>
+              </div>
+
+              <div class="panel">
+                <div class="panel-header">
+                  <div>
+                    <h3>Project status</h3>
+                    <div class="panel-subtext">Quick overview of what this MVP handles today.</div>
+                  </div>
+                </div>
+                <div class="simple-list">
+                  <div class="simple-item">
+                    <strong>Sheets created by script</strong>
+                    <div class="panel-subtext">Cards, Transactions, Payments, Installments, Alerts, Settings.</div>
+                  </div>
+                  <div class="simple-item">
+                    <strong>Primary files</strong>
+                    <div class="panel-subtext">`index.html`, `code.gs`, `appsscript.json`.</div>
+                  </div>
+                  <div class="simple-item">
+                    <strong>Current MVP</strong>
+                    <div class="panel-subtext">Setup data, card management, add transaction, dashboard metrics, reports, and rule-based alerts.</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <nav class="mobile-nav" id="mobileNav"></nav>
+    <div class="toast" id="toast"></div>
+
+    <div class="loading hidden" id="loadingState">
+      <div class="loading-card">
+        <div class="spinner"></div>
+        <strong>Working on your data</strong>
+        <div class="panel-subtext" id="loadingMessage">Loading project state...</div>
+      </div>
+    </div>
+
+    <script>
+      const NAV_ITEMS = [
+        { id: 'dashboard', label: 'Dashboard', icon: 'dashboard' },
+        { id: 'cards', label: 'Cards', icon: 'credit_card' },
+        { id: 'add', label: 'Add', icon: 'add_circle' },
+        { id: 'reports', label: 'Reports', icon: 'monitoring' },
+        { id: 'settings', label: 'Settings', icon: 'settings' },
+      ];
+
+      const VIEW_META = {
+        dashboard: {
+          title: 'Dashboard',
+          subtitle: 'Inspect balances, utilization, alerts, and recent activity.',
+        },
+        cards: {
+          title: 'Cards',
+          subtitle: 'Manage the active card portfolio and preserve safe balance tracking.',
+        },
+        add: {
+          title: 'Add Transaction',
+          subtitle: 'Record spending and watch balance changes update instantly.',
+        },
+        reports: {
+          title: 'Reports',
+          subtitle: 'Review trends, category totals, card usage, and top transactions.',
+        },
+        settings: {
+          title: 'Settings',
+          subtitle: 'Check project placeholders, setup state, and spreadsheet details.',
+        },
+      };
+
+      const CATEGORIES = [
+        'Food & Dining',
+        'Fuel',
+        'Shopping',
+        'Travel',
+        'Insurance',
+        'Utilities',
+        'Installments',
+        'Healthcare',
+        'Entertainment',
+        'Others',
+      ];
+
+      const state = {
+        activeView: 'dashboard',
+        data: null,
+      };
+
+      document.addEventListener('DOMContentLoaded', function() {
+        buildNavigation();
+        bindEvents();
+        setDefaultFormValues();
+        loadData();
+      });
+
+      function buildNavigation() {
+        const desktopNav = document.getElementById('desktopNav');
+        const mobileNav = document.getElementById('mobileNav');
+
+        desktopNav.innerHTML = NAV_ITEMS.map(renderNavButton).join('');
+        mobileNav.innerHTML = NAV_ITEMS.map(renderNavButton).join('');
+        syncNavigation();
+      }
+
+      function renderNavButton(item) {
+        return `
+          <button class="nav-button" type="button" data-view="${item.id}">
+            <span class="icon">${item.icon}</span>
+            <span>${item.label}</span>
+          </button>
+        `;
+      }
+
+      function bindEvents() {
+        document.body.addEventListener('click', function(event) {
+          const navButton = event.target.closest('[data-view]');
+          if (navButton) {
+            setActiveView(navButton.getAttribute('data-view'));
+          }
+
+          const editButton = event.target.closest('[data-edit-card]');
+          if (editButton) {
+            const cardId = editButton.getAttribute('data-edit-card');
+            populateCardForm(cardId);
+            setActiveView('cards');
+          }
+        });
+
+        document.getElementById('setupButton').addEventListener('click', handleSetup);
+        document.getElementById('refreshButton').addEventListener('click', loadData);
+        document.getElementById('resetCardButton').addEventListener('click', resetCardForm);
+        document.getElementById('cardForm').addEventListener('submit', handleCardSubmit);
+        document.getElementById('transactionForm').addEventListener('submit', handleTransactionSubmit);
+        document.getElementById('simulatorForm').addEventListener('submit', handleSimulatorSubmit);
+      }
+
+      function setDefaultFormValues() {
+        document.getElementById('transactionDate').value = toInputDate(new Date());
+        document.getElementById('transactionCategory').innerHTML = CATEGORIES.map(function(category) {
+          return `<option value="${escapeHtml(category)}">${escapeHtml(category)}</option>`;
+        }).join('');
+        resetCardForm();
+      }
+
+      function setActiveView(view) {
+        state.activeView = view;
+        syncNavigation();
+
+        document.querySelectorAll('.view-section').forEach(function(section) {
+          section.classList.add('hidden');
+        });
+
+        const target = document.getElementById(view + 'Section');
+        if (target) {
+          target.classList.remove('hidden');
+        }
+
+        const meta = VIEW_META[view] || VIEW_META.dashboard;
+        document.getElementById('pageTitle').textContent = meta.title;
+        document.getElementById('pageSubtitle').textContent = meta.subtitle;
+      }
+
+      function syncNavigation() {
+        document.querySelectorAll('[data-view]').forEach(function(button) {
+          button.classList.toggle('active', button.getAttribute('data-view') === state.activeView);
+        });
+      }
+
+      function setLoading(isLoading, message) {
+        const loadingState = document.getElementById('loadingState');
+        loadingState.classList.toggle('hidden', !isLoading);
+        document.getElementById('loadingMessage').textContent = message || 'Loading project state...';
+      }
+
+      function showToast(message, isError) {
+        const toast = document.getElementById('toast');
+        toast.textContent = message;
+        toast.style.borderColor = isError ? 'rgba(239, 68, 68, 0.5)' : 'rgba(167, 139, 250, 0.4)';
+        toast.style.color = isError ? '#fecaca' : '#fafafa';
+        toast.classList.add('show');
+        window.clearTimeout(showToast.timer);
+        showToast.timer = window.setTimeout(function() {
+          toast.classList.remove('show');
+        }, 3200);
+      }
+
+      function callServer(functionName, payload) {
+        return new Promise(function(resolve, reject) {
+          if (!(window.google && google.script && google.script.run)) {
+            reject(new Error('Open this file as a Google Apps Script web app to use server features.'));
+            return;
+          }
+
+          const runner = google.script.run
+            .withSuccessHandler(resolve)
+            .withFailureHandler(function(error) {
+              reject(new Error(error && error.message ? error.message : String(error)));
+            });
+
+          if (typeof payload === 'undefined') {
+            runner[functionName]();
+          } else {
+            runner[functionName](payload);
+          }
+        });
+      }
+
+      async function loadData() {
+        setLoading(true, 'Loading project data...');
+        try {
+          const data = await callServer('getAppData');
+          state.data = data;
+          renderApp();
+        } catch (error) {
+          showToast(error.message, true);
+        } finally {
+          setLoading(false);
+        }
+      }
+
+      async function handleSetup() {
+        setLoading(true, 'Creating sheets and seeding demo data...');
+        try {
+          const data = await callServer('setupProject');
+          state.data = data;
+          renderApp();
+          showToast('Spreadsheet tables and demo data are ready.');
+        } catch (error) {
+          showToast(error.message, true);
+        } finally {
+          setLoading(false);
+        }
+      }
+
+      async function handleCardSubmit(event) {
+        event.preventDefault();
+        const formData = new FormData(event.target);
+        const payload = Object.fromEntries(formData.entries());
+        setLoading(true, 'Saving card...');
+        try {
+          const data = await callServer('saveCard', payload);
+          state.data = data;
+          renderApp();
+          resetCardForm();
+          showToast('Card saved successfully.');
+        } catch (error) {
+          showToast(error.message, true);
+        } finally {
+          setLoading(false);
+        }
+      }
+
+      async function handleTransactionSubmit(event) {
+        event.preventDefault();
+        const formData = new FormData(event.target);
+        const payload = Object.fromEntries(formData.entries());
+        setLoading(true, 'Saving transaction...');
+        try {
+          const data = await callServer('addTransaction', payload);
+          state.data = data;
+          renderApp();
+          event.target.reset();
+          document.getElementById('transactionDate').value = toInputDate(new Date());
+          showToast('Transaction saved and dashboard updated.');
+        } catch (error) {
+          showToast(error.message, true);
+        } finally {
+          setLoading(false);
+        }
+      }
+
+      async function handleSimulatorSubmit(event) {
+        event.preventDefault();
+        const amount = Number(document.getElementById('simulatorAmount').value || 0);
+        setLoading(true, 'Running purchase simulator...');
+        try {
+          const result = await callServer('simulatePurchase', amount);
+          renderSimulator(result);
+        } catch (error) {
+          showToast(error.message, true);
+        } finally {
+          setLoading(false);
+        }
+      }
+
+      function renderApp() {
+        const data = state.data || {};
+        const needsSetup = !!data.needsSetup;
+        document.getElementById('setupState').classList.toggle('hidden', !needsSetup);
+        document.getElementById('appState').classList.toggle('hidden', needsSetup);
+
+        const sheetLink = document.getElementById('sheetLink');
+        if (data.spreadsheetUrl) {
+          sheetLink.href = data.spreadsheetUrl;
+          sheetLink.classList.remove('hidden');
+        } else {
+          sheetLink.classList.add('hidden');
+        }
+
+        document.getElementById('sidebarMeta').textContent = needsSetup
+          ? 'Run setup once to create the Sheets tables and seed demo data for this project.'
+          : 'Data ready. Spreadsheet tables are connected and the dashboard is live.';
+
+        if (needsSetup) {
+          return;
+        }
+
+        renderDashboard();
+        renderCards();
+        renderAddTransaction();
+        renderReports();
+        renderSettings();
+        populateTransactionCards();
+        renderSimulator(state.data.simulatorExample);
+        setActiveView(state.activeView);
+      }
+
+      function renderDashboard() {
+        const dashboard = state.data.dashboard;
+        const stats = [
+          { label: 'Total credit limit', value: formatCurrency(dashboard.totalCreditLimit), foot: `${dashboard.activeCardCount} active cards` },
+          { label: 'Current balance', value: formatCurrency(dashboard.totalCurrentBalance), foot: `${dashboard.overallUtilization}% overall utilization` },
+          { label: 'Available credit', value: formatCurrency(dashboard.totalAvailableCredit), foot: `${dashboard.alertCount} active alerts` },
+          { label: 'Recent activity', value: String(dashboard.recentTransactions.length), foot: 'Latest transactions on the dashboard' },
+        ];
+
+        document.getElementById('statsGrid').innerHTML = stats.map(function(stat) {
+          return `
+            <div class="panel stat-card">
+              <div class="eyebrow">${escapeHtml(stat.label)}</div>
+              <div class="stat-value">${escapeHtml(stat.value)}</div>
+              <div class="stat-foot">${escapeHtml(stat.foot)}</div>
+            </div>
+          `;
+        }).join('');
+
+        document.getElementById('dashboardCards').innerHTML = renderCardCollection(state.data.cards);
+        document.getElementById('alertsList').innerHTML = renderAlerts(state.data.alerts);
+        document.getElementById('insightsList').innerHTML = renderInsights(state.data.insights);
+        document.getElementById('recentTransactions').innerHTML = renderTransactions(state.data.dashboard.recentTransactions);
+      }
+
+      function renderCards() {
+        document.getElementById('cardsList').innerHTML = renderCardCollection(state.data.cards, true);
+      }
+
+      function renderAddTransaction() {
+        document.getElementById('quickCardBalances').innerHTML = renderCardCollection(state.data.cards);
+        document.getElementById('latestEntries').innerHTML = renderTransactions(state.data.transactions.slice(0, 6));
+      }
+
+      function renderReports() {
+        const reports = state.data.reports;
+        document.getElementById('monthlyChart').innerHTML = renderBarChart(reports.monthlySpending, formatCurrency);
+        document.getElementById('categoryChart').innerHTML = renderBarChart(reports.categorySpending, formatCurrency);
+        document.getElementById('cardChart').innerHTML = renderBarChart(reports.cardSpending, formatCurrency);
+        document.getElementById('utilizationChart').innerHTML = renderBarChart(reports.utilizationByCard, function(value) {
+          return value + '%';
+        });
+        document.getElementById('merchantChart').innerHTML = renderBarChart(reports.merchantUsage, formatCurrency);
+        document.getElementById('topTransactions').innerHTML = renderTransactions(reports.topTransactions);
+      }
+
+      function renderSettings() {
+        const settings = state.data.settings || {};
+        const rows = [
+          { label: 'Project name', value: state.data.projectName || 'Cradit Tracking' },
+          { label: 'Currency', value: settings.currency || 'THB' },
+          { label: 'Utilization warning', value: (settings.warningUtilization || '50') + '%' },
+          { label: 'Utilization danger', value: (settings.dangerUtilization || '80') + '%' },
+          { label: 'Statement notice days', value: settings.statementNoticeDays || '7,3,1' },
+          { label: 'Payment notice days', value: settings.paymentNoticeDays || '7,3,1' },
+          { label: 'Generated at', value: state.data.generatedAt ? new Date(state.data.generatedAt).toLocaleString() : '-' },
+        ];
+
+        document.getElementById('settingsList').innerHTML = rows.map(function(item) {
+          return `
+            <div class="simple-item">
+              <strong>${escapeHtml(item.label)}</strong>
+              <div class="panel-subtext">${escapeHtml(String(item.value))}</div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      function renderCardCollection(cards, showEdit) {
+        if (!cards || !cards.length) {
+          return `<div class="empty-state">No cards yet. Run setup or add your first card.</div>`;
+        }
+
+        return cards.map(function(card) {
+          const utilizationColor = card.statusColor || '#34d399';
+          return `
+            <div class="credit-card">
+              <div class="credit-card-top">
+                <div class="credit-card-title">
+                  <span class="color-chip" style="background:${escapeHtml(card.cardColor)}"></span>
+                  <div>
+                    <h4>${escapeHtml(card.cardName)}</h4>
+                    <div class="muted">${escapeHtml(card.bankName)} • ${escapeHtml(card.cardType)}</div>
+                  </div>
+                </div>
+                ${showEdit ? `<button class="button" type="button" data-edit-card="${escapeHtml(card.id)}">Edit</button>` : `<span class="badge">${card.isActive ? 'Active' : 'Archived'}</span>`}
+              </div>
+
+              <div class="metric-pair">
+                <div>
+                  <div class="muted">Credit limit</div>
+                  <strong>${formatCurrency(card.creditLimit)}</strong>
+                </div>
+                <div>
+                  <div class="muted">Current balance</div>
+                  <strong>${formatCurrency(card.currentBalance)}</strong>
+                </div>
+                <div>
+                  <div class="muted">Available credit</div>
+                  <strong>${formatCurrency(card.availableCredit)}</strong>
+                </div>
+                <div>
+                  <div class="muted">Statement / Due</div>
+                  <strong>${escapeHtml(card.statementDate)} / ${escapeHtml(card.paymentDueDate)}</strong>
+                </div>
+              </div>
+
+              <div class="mini-meta">
+                <span class="pill">Utilization ${card.utilization}%</span>
+                <span class="pill">Statement in ${card.statementInDays}d</span>
+                <span class="pill">Due in ${card.paymentDueInDays}d</span>
+              </div>
+
+              <div class="meter">
+                <div class="meter-fill" style="width:${Math.min(card.utilization, 100)}%; background:${escapeHtml(utilizationColor)};"></div>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      function renderAlerts(alerts) {
+        if (!alerts || !alerts.length) {
+          return `<div class="empty-state">No alerts right now. Utilization and due dates are looking healthy.</div>`;
+        }
+
+        return alerts.slice(0, 8).map(function(alert) {
+          return `
+            <div class="simple-item severity-${escapeHtml(alert.severity)}">
+              <strong>${escapeHtml(alert.title)}</strong>
+              <div class="panel-subtext">${escapeHtml(alert.message)}</div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      function renderInsights(insights) {
+        if (!insights || !insights.length) {
+          return `<div class="empty-state">No insights yet. Add more activity to generate rule-based suggestions.</div>`;
+        }
+
+        return insights.map(function(insight) {
+          return `
+            <div class="simple-item">
+              <strong>Insight</strong>
+              <div class="panel-subtext">${escapeHtml(insight)}</div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      function renderTransactions(transactions) {
+        if (!transactions || !transactions.length) {
+          return `<div class="empty-state">No transactions to display.</div>`;
+        }
+
+        return `<div class="table-like">
+          ${transactions.map(function(transaction) {
+            return `
+              <div class="table-row">
+                <div>
+                  <strong>${escapeHtml(transaction.merchant)}</strong>
+                  <div class="panel-subtext">${escapeHtml(transaction.cardName)} • ${escapeHtml(transaction.category)}</div>
+                </div>
+                <div class="muted">${escapeHtml(transaction.date)}</div>
+                <div><strong>${formatCurrency(transaction.amount)}</strong></div>
+              </div>
+            `;
+          }).join('')}
+        </div>`;
+      }
+
+      function renderBarChart(series, formatter) {
+        if (!series || !series.length) {
+          return `<div class="empty-state">No report data available yet.</div>`;
+        }
+
+        const max = Math.max.apply(null, series.map(function(item) { return item.value; })) || 1;
+        return `<div class="bar-list">
+          ${series.map(function(item) {
+            const width = Math.max((item.value / max) * 100, 6);
+            return `
+              <div class="bar-row">
+                <div class="bar-row-head">
+                  <span>${escapeHtml(item.label)}</span>
+                  <strong>${escapeHtml(String(formatter(item.value)))}</strong>
+                </div>
+                <div class="bar-track">
+                  <div class="bar-fill" style="width:${width}%"></div>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>`;
+      }
+
+      function renderSimulator(result) {
+        const container = document.getElementById('simulatorResult');
+        if (!result || !result.cards) {
+          container.innerHTML = `<div class="empty-state">Enter a purchase amount to compare cards.</div>`;
+          return;
+        }
+
+        container.innerHTML = `
+          <div class="simple-item">
+            <strong>${escapeHtml(result.recommendation)}</strong>
+            <div class="panel-subtext">Simulated purchase: ${formatCurrency(result.amount || 0)}</div>
+          </div>
+          <div class="simple-list" style="margin-top:12px;">
+            ${result.cards.map(function(card) {
+              return `
+                <div class="simple-item">
+                  <div class="list-row">
+                    <strong>${escapeHtml(card.cardName)}</strong>
+                    <span class="badge">${card.canUse ? 'Recommended range' : 'Over limit'}</span>
+                  </div>
+                  <div class="mini-meta">
+                    <span class="pill">New utilization ${card.newUtilization}%</span>
+                    <span class="pill">Remaining ${formatCurrency(card.newAvailableCredit)}</span>
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        `;
+      }
+
+      function populateTransactionCards() {
+        const cards = (state.data.cards || []).filter(function(card) { return card.isActive; });
+        const options = cards.map(function(card) {
+          return `<option value="${escapeHtml(card.id)}">${escapeHtml(card.cardName)} • ${formatCurrency(card.availableCredit)} free</option>`;
+        }).join('');
+        document.getElementById('transactionCardId').innerHTML = options;
+      }
+
+      function populateCardForm(cardId) {
+        const card = (state.data.cards || []).find(function(item) { return item.id === cardId; });
+        if (!card) {
+          return;
+        }
+
+        document.getElementById('cardFormTitle').textContent = 'Edit card';
+        document.getElementById('cardId').value = card.id;
+        document.getElementById('cardCreatedAt').value = card.createdAt || '';
+        document.getElementById('cardName').value = card.cardName || '';
+        document.getElementById('bankName').value = card.bankName || '';
+        document.getElementById('creditLimit').value = card.creditLimit || '';
+        document.getElementById('cardType').value = card.cardType || '';
+        document.getElementById('statementDay').value = card.statementDay || 1;
+        document.getElementById('paymentDueDay').value = card.paymentDueDay || 1;
+        document.getElementById('cardColor').value = card.cardColor || '#a78bfa';
+        document.getElementById('isActive').value = String(!!card.isActive);
+        document.getElementById('cardNotes').value = card.notes || '';
+      }
+
+      function resetCardForm() {
+        document.getElementById('cardFormTitle').textContent = 'Add new card';
+        document.getElementById('cardForm').reset();
+        document.getElementById('cardId').value = '';
+        document.getElementById('cardCreatedAt').value = '';
+        document.getElementById('cardColor').value = '#a78bfa';
+        document.getElementById('statementDay').value = 12;
+        document.getElementById('paymentDueDay').value = 5;
+        document.getElementById('isActive').value = 'true';
+      }
+
+      function formatCurrency(value) {
+        return new Intl.NumberFormat('en-US', {
+          style: 'currency',
+          currency: 'THB',
+          minimumFractionDigits: 0,
+          maximumFractionDigits: 0,
+        }).format(Number(value || 0));
+      }
+
+      function toInputDate(date) {
+        return date.toISOString().slice(0, 10);
+      }
+
+      function escapeHtml(value) {
+        return String(value == null ? '' : value)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+      }
+    </script>
+  </body>
+</html>
