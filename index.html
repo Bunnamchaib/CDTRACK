@@ -658,6 +658,7 @@
 
           <div class="toolbar">
             <a class="button ghost hidden" id="sheetLink" target="_blank" rel="noopener noreferrer">Open spreadsheet</a>
+            <button class="button" id="healthButton" type="button">Check connection</button>
             <button class="button" id="refreshButton" type="button">Refresh data</button>
             <button class="button primary" id="setupButton" type="button">Setup sheets + demo data</button>
           </div>
@@ -984,6 +985,16 @@
                 </div>
               </div>
             </div>
+
+            <div class="panel" style="margin-top:18px;">
+              <div class="panel-header">
+                <div>
+                  <h3>Sheet connection status</h3>
+                  <div class="panel-subtext">Checks whether the project is linked to the expected spreadsheet and whether each table exists.</div>
+                </div>
+              </div>
+              <div id="systemStatusPanel"></div>
+            </div>
           </div>
         </section>
       </main>
@@ -1091,6 +1102,7 @@
         });
 
         document.getElementById('setupButton').addEventListener('click', handleSetup);
+        document.getElementById('healthButton').addEventListener('click', handleHealthCheck);
         document.getElementById('refreshButton').addEventListener('click', loadData);
         document.getElementById('resetCardButton').addEventListener('click', resetCardForm);
         document.getElementById('cardForm').addEventListener('submit', handleCardSubmit);
@@ -1185,10 +1197,25 @@
       async function handleSetup() {
         setLoading(true, 'Creating sheets and seeding demo data...');
         try {
-          const data = await callServer('setupProject');
+          const data = await callServer('runSetupAndCheck');
           state.data = data;
           renderApp();
           showToast('Spreadsheet tables and demo data are ready.');
+        } catch (error) {
+          showToast(error.message, true);
+        } finally {
+          setLoading(false);
+        }
+      }
+
+      async function handleHealthCheck() {
+        setLoading(true, 'Checking spreadsheet connection...');
+        try {
+          const systemStatus = await callServer('getSystemStatus');
+          state.data = state.data || {};
+          state.data.systemStatus = systemStatus;
+          renderSystemStatus(systemStatus);
+          showToast(systemStatus.message || 'Connection check completed.');
         } catch (error) {
           showToast(error.message, true);
         } finally {
@@ -1276,6 +1303,7 @@
         renderSettings();
         populateTransactionCards();
         renderSimulator(state.data.simulatorExample);
+        renderSystemStatus(state.data.systemStatus);
         setActiveView(state.activeView);
       }
 
@@ -1327,6 +1355,7 @@
 
       function renderSettings() {
         const settings = state.data.settings || {};
+        const systemStatus = state.data.systemStatus || {};
         const rows = [
           { label: 'Project name', value: state.data.projectName || 'Cradit Tracking' },
           { label: 'Currency', value: settings.currency || 'THB' },
@@ -1334,6 +1363,7 @@
           { label: 'Utilization danger', value: (settings.dangerUtilization || '80') + '%' },
           { label: 'Statement notice days', value: settings.statementNoticeDays || '7,3,1' },
           { label: 'Payment notice days', value: settings.paymentNoticeDays || '7,3,1' },
+          { label: 'Spreadsheet connected', value: systemStatus.connected ? 'Yes' : 'No' },
           { label: 'Generated at', value: state.data.generatedAt ? new Date(state.data.generatedAt).toLocaleString() : '-' },
         ];
 
@@ -1345,6 +1375,52 @@
             </div>
           `;
         }).join('');
+      }
+
+      function renderSystemStatus(systemStatus) {
+        const container = document.getElementById('systemStatusPanel');
+        if (!container) {
+          return;
+        }
+
+        if (!systemStatus) {
+          container.innerHTML = `<div class="empty-state">Connection status has not been checked yet.</div>`;
+          return;
+        }
+
+        const rows = systemStatus.sheetStatus || [];
+        const missing = systemStatus.missingSheets || [];
+
+        container.innerHTML = `
+          <div class="simple-list">
+            <div class="simple-item">
+              <strong>${escapeHtml(systemStatus.message || 'Status unavailable')}</strong>
+              <div class="panel-subtext">${systemStatus.spreadsheetUrl ? `<a href="${escapeHtml(systemStatus.spreadsheetUrl)}" target="_blank" rel="noopener noreferrer">Open connected spreadsheet</a>` : 'No spreadsheet linked yet.'}</div>
+            </div>
+            ${missing.length ? `
+              <div class="simple-item">
+                <strong>Missing sheets</strong>
+                <div class="panel-subtext">${escapeHtml(missing.join(', '))}</div>
+              </div>
+            ` : ''}
+            ${rows.length ? `
+              <div class="table-like">
+                ${rows.map(function(row) {
+                  return `
+                    <div class="table-row">
+                      <div>
+                        <strong>${escapeHtml(row.name)}</strong>
+                        <div class="panel-subtext">${row.exists ? 'Sheet found' : 'Sheet missing'}</div>
+                      </div>
+                      <div class="muted">${row.hasHeaders ? 'Headers ready' : 'No headers'}</div>
+                      <div><strong>${escapeHtml(String(row.rowCount))} rows</strong></div>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            ` : ''}
+          </div>
+        `;
       }
 
       function renderCardCollection(cards, showEdit) {

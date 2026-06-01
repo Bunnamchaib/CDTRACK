@@ -35,3 +35,9 @@
 - ปัญหา: ตัว deploy ปัจจุบัน error ว่า `No HTML file named index was found. (line 15, file "รหัส")` แปลว่าฝั่ง Apps Script ที่ deploy อยู่ยังไม่มีไฟล์ `index` ตามที่ `doGet()` เรียกใช้ หรือยังไม่ได้อัปเดตโค้ดล่าสุดขึ้นไป และเครื่องนี้ยังไม่มี `clasp`/การเชื่อม Chrome session สำหรับเข้าไปแก้โปรเจ็กต์ Apps Script ตรง ๆ
 - แก้อย่างไร: ยืนยันว่าโค้ดล่าสุดใน Main Project และบน GitHub มี `index.html` + `code.gs` ครบแล้ว ปัญหาหลักอยู่ที่ฝั่ง Apps Script project/deployment ไม่ใช่ไฟล์ใน repo
 - ทำต่อ: ต้องเข้าถึง Apps Script editor ของโปรเจ็กต์นั้นก่อน แล้วค่อยอัปโหลด `index.html`, `code.gs`, `appsscript.json` และ redeploy Web App ใหม่
+
+## 2026-06-01 11:26:59
+- ทำอะไรไป: ตรวจ logic การสร้างข้อมูลตั้งต้นและการเชื่อม spreadsheet ใน `code.gs`, เพิ่มระบบเช็กสถานะการเชื่อมต่อ, เพิ่มฟังก์ชัน `runSetupAndCheck()` และ `getSystemStatus()`, ทำให้ระบบพยายามหา spreadsheet เดิมกลับมาได้ถ้า property หลุด, และทำให้ seed ข้อมูลเติมเฉพาะชีตที่ยังว่าง
+- ปัญหา: flow เดิมมีโอกาสหลุดการเชื่อมกับ spreadsheet เดิมหลัง deploy/ย้ายโปรเจ็กต์ และถ้าการสร้างตารางค้างกลางทางอาจเหลือบางชีตว่าง ทำให้เหมือน setup ไม่สำเร็จ
+- แก้อย่างไร: ปรับให้ `getAppData()` และ `setup` ตรวจ-ซ่อม-เติมข้อมูลอัตโนมัติ, เพิ่มสถานะ `systemStatus` ส่งกลับหน้าเว็บ, และเพิ่มปุ่ม `Check connection` กับ panel แสดงว่าแต่ละชีตถูกสร้างแล้วหรือยัง
+- ทำต่อ: เอาโค้ดรอบนี้ขึ้น Apps Script, redeploy ใหม่, กด `Setup sheets + demo data` หรือ `Check connection`, แล้วดู panel ว่าชีต `Cards/Transactions/Payments/Installments/Alerts/Settings` ครบและมีจำนวนแถวตามคาดหรือไม่

@@ -24,22 +24,42 @@ function getAppData() {
       projectName: PROJECT_NAME,
       needsSetup: true,
       generatedAt: new Date().toISOString(),
+      systemStatus: buildSystemStatus_(null),
     };
   }
 
   initializeSheets_(spreadsheet);
+  ensureDemoData_(spreadsheet);
   const payload = buildAppPayload_(spreadsheet);
   syncAlertsSheet_(spreadsheet, payload.alerts);
+  payload.systemStatus = buildSystemStatus_(spreadsheet);
   return payload;
 }
 
 function setupProject() {
   const spreadsheet = ensureProjectSpreadsheet_();
   initializeSheets_(spreadsheet);
-  seedIfEmpty_(spreadsheet);
+  ensureDemoData_(spreadsheet);
 
   const payload = buildAppPayload_(spreadsheet);
   syncAlertsSheet_(spreadsheet, payload.alerts);
+  payload.setupCompletedAt = new Date().toISOString();
+  payload.systemStatus = buildSystemStatus_(spreadsheet);
+  return payload;
+}
+
+function getSystemStatus() {
+  const spreadsheet = openProjectSpreadsheet_();
+  return buildSystemStatus_(spreadsheet);
+}
+
+function runSetupAndCheck() {
+  const spreadsheet = ensureProjectSpreadsheet_();
+  initializeSheets_(spreadsheet);
+  ensureDemoData_(spreadsheet);
+  const payload = buildAppPayload_(spreadsheet);
+  syncAlertsSheet_(spreadsheet, payload.alerts);
+  payload.systemStatus = buildSystemStatus_(spreadsheet);
   payload.setupCompletedAt = new Date().toISOString();
   return payload;
 }
@@ -136,21 +156,38 @@ function ensureProjectSpreadsheet_() {
     }
   }
 
+  const recoveredSpreadsheet = findExistingProjectSpreadsheet_();
+  if (recoveredSpreadsheet) {
+    properties.setProperty(SPREADSHEET_PROPERTY_KEY, recoveredSpreadsheet.getId());
+    return recoveredSpreadsheet;
+  }
+
   const spreadsheet = SpreadsheetApp.create(PROJECT_NAME + ' Data');
   properties.setProperty(SPREADSHEET_PROPERTY_KEY, spreadsheet.getId());
   return spreadsheet;
 }
 
 function openProjectSpreadsheet_() {
-  const spreadsheetId = PropertiesService.getScriptProperties().getProperty(SPREADSHEET_PROPERTY_KEY);
+  const properties = PropertiesService.getScriptProperties();
+  const spreadsheetId = properties.getProperty(SPREADSHEET_PROPERTY_KEY);
   if (!spreadsheetId) {
+    const recoveredSpreadsheet = findExistingProjectSpreadsheet_();
+    if (recoveredSpreadsheet) {
+      properties.setProperty(SPREADSHEET_PROPERTY_KEY, recoveredSpreadsheet.getId());
+      return recoveredSpreadsheet;
+    }
     return null;
   }
 
   try {
     return SpreadsheetApp.openById(spreadsheetId);
   } catch (error) {
-    PropertiesService.getScriptProperties().deleteProperty(SPREADSHEET_PROPERTY_KEY);
+    properties.deleteProperty(SPREADSHEET_PROPERTY_KEY);
+    const recoveredSpreadsheet = findExistingProjectSpreadsheet_();
+    if (recoveredSpreadsheet) {
+      properties.setProperty(SPREADSHEET_PROPERTY_KEY, recoveredSpreadsheet.getId());
+      return recoveredSpreadsheet;
+    }
     return null;
   }
 }
@@ -201,11 +238,6 @@ function removeEmptyDefaultSheet_(spreadsheet) {
 }
 
 function seedIfEmpty_(spreadsheet) {
-  const cardsSheet = spreadsheet.getSheetByName('Cards');
-  if (cardsSheet.getLastRow() > 1) {
-    return;
-  }
-
   const now = new Date().toISOString();
   const cards = [
     ['CARD-1001', 'KBank Everyday', 'Kasikornbank', 85000, 12, 5, '#a78bfa', 'Rewards', 'Best for daily spending', true, now, now],
@@ -237,11 +269,11 @@ function seedIfEmpty_(spreadsheet) {
     ['paymentNoticeDays', '7,3,1', 'Days before payment due date to alert'],
   ];
 
-  cardsSheet.getRange(2, 1, cards.length, cards[0].length).setValues(cards);
-  spreadsheet.getSheetByName('Transactions').getRange(2, 1, transactions.length, transactions[0].length).setValues(transactions);
-  spreadsheet.getSheetByName('Payments').getRange(2, 1, payments.length, payments[0].length).setValues(payments);
-  spreadsheet.getSheetByName('Installments').getRange(2, 1, installments.length, installments[0].length).setValues(installments);
-  spreadsheet.getSheetByName('Settings').getRange(2, 1, settings.length, settings[0].length).setValues(settings);
+  seedSheetIfEmpty_(spreadsheet.getSheetByName('Cards'), cards);
+  seedSheetIfEmpty_(spreadsheet.getSheetByName('Transactions'), transactions);
+  seedSheetIfEmpty_(spreadsheet.getSheetByName('Payments'), payments);
+  seedSheetIfEmpty_(spreadsheet.getSheetByName('Installments'), installments);
+  seedSheetIfEmpty_(spreadsheet.getSheetByName('Settings'), settings);
 }
 
 function buildSampleTransactions_(timestamp) {
@@ -649,6 +681,92 @@ function createAlert_(type, severity, cardId, title, message) {
     cardId: cardId,
     createdAt: new Date().toISOString(),
     isRead: false,
+  };
+}
+
+function ensureDemoData_(spreadsheet) {
+  seedIfEmpty_(spreadsheet);
+}
+
+function seedSheetIfEmpty_(sheet, rows) {
+  if (!sheet || !rows || !rows.length) {
+    return false;
+  }
+
+  if (sheet.getLastRow() > 1) {
+    return false;
+  }
+
+  sheet.getRange(2, 1, rows.length, rows[0].length).setValues(rows);
+  return true;
+}
+
+function findExistingProjectSpreadsheet_() {
+  const targetName = PROJECT_NAME + ' Data';
+  const files = DriveApp.getFilesByName(targetName);
+
+  while (files.hasNext()) {
+    const file = files.next();
+    try {
+      const spreadsheet = SpreadsheetApp.open(file);
+      if (hasCoreSheets_(spreadsheet)) {
+        return spreadsheet;
+      }
+    } catch (error) {
+      // Ignore inaccessible candidates and continue checking the next file.
+    }
+  }
+
+  return null;
+}
+
+function hasCoreSheets_(spreadsheet) {
+  const names = spreadsheet.getSheets().map(function(sheet) {
+    return sheet.getName();
+  });
+
+  return Object.keys(SHEET_DEFINITIONS).some(function(sheetName) {
+    return names.indexOf(sheetName) !== -1;
+  });
+}
+
+function buildSystemStatus_(spreadsheet) {
+  if (!spreadsheet) {
+    return {
+      projectName: PROJECT_NAME,
+      connected: false,
+      spreadsheetFound: false,
+      message: 'No project spreadsheet is connected yet. Run setup to create one.',
+      sheetStatus: [],
+      missingSheets: Object.keys(SHEET_DEFINITIONS),
+    };
+  }
+
+  const sheetStatus = Object.keys(SHEET_DEFINITIONS).map(function(sheetName) {
+    const sheet = spreadsheet.getSheetByName(sheetName);
+    const rowCount = sheet ? Math.max(sheet.getLastRow() - 1, 0) : 0;
+    return {
+      name: sheetName,
+      exists: !!sheet,
+      rowCount: rowCount,
+      hasHeaders: !!sheet && sheet.getLastRow() >= 1,
+    };
+  });
+
+  const missingSheets = sheetStatus
+    .filter(function(item) { return !item.exists; })
+    .map(function(item) { return item.name; });
+
+  return {
+    projectName: PROJECT_NAME,
+    connected: true,
+    spreadsheetFound: true,
+    spreadsheetId: spreadsheet.getId(),
+    spreadsheetUrl: spreadsheet.getUrl(),
+    spreadsheetName: spreadsheet.getName(),
+    message: missingSheets.length ? 'Some sheets are still missing and need repair.' : 'Spreadsheet connection is healthy.',
+    sheetStatus: sheetStatus,
+    missingSheets: missingSheets,
   };
 }
 
