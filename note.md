@@ -41,3 +41,9 @@
 - ปัญหา: flow เดิมมีโอกาสหลุดการเชื่อมกับ spreadsheet เดิมหลัง deploy/ย้ายโปรเจ็กต์ และถ้าการสร้างตารางค้างกลางทางอาจเหลือบางชีตว่าง ทำให้เหมือน setup ไม่สำเร็จ
 - แก้อย่างไร: ปรับให้ `getAppData()` และ `setup` ตรวจ-ซ่อม-เติมข้อมูลอัตโนมัติ, เพิ่มสถานะ `systemStatus` ส่งกลับหน้าเว็บ, และเพิ่มปุ่ม `Check connection` กับ panel แสดงว่าแต่ละชีตถูกสร้างแล้วหรือยัง
 - ทำต่อ: เอาโค้ดรอบนี้ขึ้น Apps Script, redeploy ใหม่, กด `Setup sheets + demo data` หรือ `Check connection`, แล้วดู panel ว่าชีต `Cards/Transactions/Payments/Installments/Alerts/Settings` ครบและมีจำนวนแถวตามคาดหรือไม่
+
+## 2026-06-01 11:31:35
+- ทำอะไรไป: แก้ `setupProject()` อีกรอบให้วิ่งเส้นทางตรงขึ้น, ตัด logic ค้นหา spreadsheet เดิมผ่าน `DriveApp` ออกจากเส้นทาง setup หลัก, และห่อ error ของ `setupProject` ให้คืนข้อความชัดขึ้น
+- ปัญหา: การใช้ `DriveApp` ใน setup หลักอาจทำให้รันจาก editor แล้ว fail แบบกว้าง ๆ ได้ ทั้งที่ผู้ใช้แค่ต้องการสร้าง spreadsheet และชีตเริ่มต้น
+- แก้อย่างไร: ให้ setup ใช้เฉพาะ `PropertiesService` + `SpreadsheetApp.openById()`/`SpreadsheetApp.create()` แล้วค่อย `initializeSheets_()` และ `ensureDemoData_()` โดยไม่แตะ Drive search ในจุดวิกฤต
+- ทำต่อ: อัปเดต `code.gs` นี้ขึ้น Apps Script แล้วลองรัน `setupProject` ใหม่จาก editor ถ้ายัง error ให้ดูข้อความใหม่ที่ควรละเอียดขึ้นกว่าของเดิม แล้วส่งกลับมาเพื่อตามแก้ต่อ

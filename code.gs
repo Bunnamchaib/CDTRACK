@@ -37,31 +37,39 @@ function getAppData() {
 }
 
 function setupProject() {
-  const spreadsheet = ensureProjectSpreadsheet_();
-  initializeSheets_(spreadsheet);
-  ensureDemoData_(spreadsheet);
+  try {
+    const spreadsheet = ensureProjectSpreadsheet_();
+    initializeSheets_(spreadsheet);
+    ensureDemoData_(spreadsheet);
 
-  const payload = buildAppPayload_(spreadsheet);
-  syncAlertsSheet_(spreadsheet, payload.alerts);
-  payload.setupCompletedAt = new Date().toISOString();
-  payload.systemStatus = buildSystemStatus_(spreadsheet);
-  return payload;
+    const payload = buildAppPayload_(spreadsheet);
+    syncAlertsSheet_(spreadsheet, payload.alerts);
+    payload.setupCompletedAt = new Date().toISOString();
+    payload.systemStatus = buildSystemStatus_(spreadsheet);
+    return payload;
+  } catch (error) {
+    throw new Error('setupProject failed: ' + (error && error.message ? error.message : error));
+  }
 }
 
 function getSystemStatus() {
-  const spreadsheet = openProjectSpreadsheet_();
-  return buildSystemStatus_(spreadsheet);
+  try {
+    const spreadsheet = openProjectSpreadsheet_();
+    return buildSystemStatus_(spreadsheet);
+  } catch (error) {
+    return {
+      projectName: PROJECT_NAME,
+      connected: false,
+      spreadsheetFound: false,
+      message: 'System status check failed: ' + (error && error.message ? error.message : error),
+      sheetStatus: [],
+      missingSheets: Object.keys(SHEET_DEFINITIONS),
+    };
+  }
 }
 
 function runSetupAndCheck() {
-  const spreadsheet = ensureProjectSpreadsheet_();
-  initializeSheets_(spreadsheet);
-  ensureDemoData_(spreadsheet);
-  const payload = buildAppPayload_(spreadsheet);
-  syncAlertsSheet_(spreadsheet, payload.alerts);
-  payload.systemStatus = buildSystemStatus_(spreadsheet);
-  payload.setupCompletedAt = new Date().toISOString();
-  return payload;
+  return setupProject();
 }
 
 function saveCard(cardInput) {
@@ -156,12 +164,6 @@ function ensureProjectSpreadsheet_() {
     }
   }
 
-  const recoveredSpreadsheet = findExistingProjectSpreadsheet_();
-  if (recoveredSpreadsheet) {
-    properties.setProperty(SPREADSHEET_PROPERTY_KEY, recoveredSpreadsheet.getId());
-    return recoveredSpreadsheet;
-  }
-
   const spreadsheet = SpreadsheetApp.create(PROJECT_NAME + ' Data');
   properties.setProperty(SPREADSHEET_PROPERTY_KEY, spreadsheet.getId());
   return spreadsheet;
@@ -171,11 +173,6 @@ function openProjectSpreadsheet_() {
   const properties = PropertiesService.getScriptProperties();
   const spreadsheetId = properties.getProperty(SPREADSHEET_PROPERTY_KEY);
   if (!spreadsheetId) {
-    const recoveredSpreadsheet = findExistingProjectSpreadsheet_();
-    if (recoveredSpreadsheet) {
-      properties.setProperty(SPREADSHEET_PROPERTY_KEY, recoveredSpreadsheet.getId());
-      return recoveredSpreadsheet;
-    }
     return null;
   }
 
@@ -183,11 +180,6 @@ function openProjectSpreadsheet_() {
     return SpreadsheetApp.openById(spreadsheetId);
   } catch (error) {
     properties.deleteProperty(SPREADSHEET_PROPERTY_KEY);
-    const recoveredSpreadsheet = findExistingProjectSpreadsheet_();
-    if (recoveredSpreadsheet) {
-      properties.setProperty(SPREADSHEET_PROPERTY_KEY, recoveredSpreadsheet.getId());
-      return recoveredSpreadsheet;
-    }
     return null;
   }
 }
@@ -699,35 +691,6 @@ function seedSheetIfEmpty_(sheet, rows) {
 
   sheet.getRange(2, 1, rows.length, rows[0].length).setValues(rows);
   return true;
-}
-
-function findExistingProjectSpreadsheet_() {
-  const targetName = PROJECT_NAME + ' Data';
-  const files = DriveApp.getFilesByName(targetName);
-
-  while (files.hasNext()) {
-    const file = files.next();
-    try {
-      const spreadsheet = SpreadsheetApp.open(file);
-      if (hasCoreSheets_(spreadsheet)) {
-        return spreadsheet;
-      }
-    } catch (error) {
-      // Ignore inaccessible candidates and continue checking the next file.
-    }
-  }
-
-  return null;
-}
-
-function hasCoreSheets_(spreadsheet) {
-  const names = spreadsheet.getSheets().map(function(sheet) {
-    return sheet.getName();
-  });
-
-  return Object.keys(SHEET_DEFINITIONS).some(function(sheetName) {
-    return names.indexOf(sheetName) !== -1;
-  });
 }
 
 function buildSystemStatus_(spreadsheet) {
