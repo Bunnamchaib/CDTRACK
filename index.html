@@ -175,6 +175,14 @@
         justify-content: flex-end;
       }
 
+      .section-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        justify-content: flex-end;
+        margin-bottom: 18px;
+      }
+
       .button {
         border: 1px solid var(--outline);
         background: var(--surface-high);
@@ -247,6 +255,17 @@
         color: var(--text-muted);
         font-size: 0.92rem;
         margin-top: 8px;
+      }
+
+      .settings-form-grid {
+        display: grid;
+        gap: 12px;
+      }
+
+      .settings-value {
+        min-height: 52px;
+        display: flex;
+        align-items: center;
       }
 
       .stat-card {
@@ -655,13 +674,6 @@
             <h2 id="pageTitle">Dashboard</h2>
             <p id="pageSubtitle">Inspect balances, utilization, alerts, and recent activity.</p>
           </div>
-
-          <div class="toolbar">
-            <a class="button ghost hidden" id="sheetLink" target="_blank" rel="noopener noreferrer">Open spreadsheet</a>
-            <button class="button" id="healthButton" type="button">Check connection</button>
-            <button class="button" id="refreshButton" type="button">Refresh data</button>
-            <button class="button primary" id="setupButton" type="button">Setup sheets + demo data</button>
-          </div>
         </div>
 
         <section id="setupState" class="panel hidden">
@@ -756,9 +768,12 @@
                   </div>
                 </div>
                 <div class="card-carousel" id="cardsList"></div>
+                <div class="form-actions" style="margin-top:18px;">
+                  <button class="button primary" id="showAddCardButton" type="button">Add card</button>
+                </div>
               </div>
 
-              <div class="panel">
+              <div class="panel hidden" id="cardFormPanel">
                 <div class="panel-header">
                   <div>
                     <h3 id="cardFormTitle">Add new card</h3>
@@ -951,15 +966,60 @@
           </div>
 
           <div id="settingsSection" class="view-section hidden">
+            <div class="section-actions">
+              <a class="button ghost hidden" id="sheetLink" target="_blank" rel="noopener noreferrer">Open spreadsheet</a>
+              <button class="button" id="healthButton" type="button">Check connection</button>
+              <button class="button" id="refreshButton" type="button">Refresh data</button>
+              <button class="button primary" id="setupButton" type="button">Setup sheets + demo data</button>
+            </div>
+
             <div class="grid two-column">
               <div class="panel">
                 <div class="panel-header">
                   <div>
                     <h3>Project settings</h3>
-                    <div class="panel-subtext">Simple placeholders kept inside the `Settings` sheet.</div>
+                    <div class="panel-subtext">Edit settings here and keep them saved in this browser on GitHub Pages.</div>
                   </div>
                 </div>
-                <div class="simple-list" id="settingsList"></div>
+                <form class="settings-form-grid" id="settingsForm">
+                  <div class="field">
+                    <label for="settingsProjectName">Project name</label>
+                    <input id="settingsProjectName" name="projectName" required>
+                  </div>
+                  <div class="field">
+                    <label for="settingsCurrency">Currency</label>
+                    <input id="settingsCurrency" name="currency" required>
+                  </div>
+                  <div class="field">
+                    <label for="settingsWarningUtilization">Utilization warning (%)</label>
+                    <input id="settingsWarningUtilization" name="warningUtilization" type="number" min="0" max="100" required>
+                  </div>
+                  <div class="field">
+                    <label for="settingsDangerUtilization">Utilization danger (%)</label>
+                    <input id="settingsDangerUtilization" name="dangerUtilization" type="number" min="0" max="100" required>
+                  </div>
+                  <div class="field">
+                    <label for="settingsStatementNoticeDays">Statement notice days</label>
+                    <input id="settingsStatementNoticeDays" name="statementNoticeDays" placeholder="7,3,1" required>
+                  </div>
+                  <div class="field">
+                    <label for="settingsPaymentNoticeDays">Payment notice days</label>
+                    <input id="settingsPaymentNoticeDays" name="paymentNoticeDays" placeholder="7,3,1" required>
+                  </div>
+                  <div class="field">
+                    <label>Spreadsheet connected</label>
+                    <div class="button ghost settings-value" id="settingsSpreadsheetConnected">-</div>
+                  </div>
+                  <div class="field">
+                    <label>Generated at</label>
+                    <div class="button ghost settings-value" id="settingsGeneratedAt">-</div>
+                  </div>
+                  <div class="form-actions">
+                    <button class="button primary" type="submit">Save settings</button>
+                    <button class="button" id="resetSettingsButton" type="button">Reset changes</button>
+                    <button class="button" id="clearSettingsButton" type="button">Delete saved settings</button>
+                  </div>
+                </form>
               </div>
 
               <div class="panel">
@@ -1060,6 +1120,8 @@
       const state = {
         activeView: 'dashboard',
         data: null,
+        baseData: null,
+        settingsOverrides: {},
       };
 
       document.addEventListener('DOMContentLoaded', function() {
@@ -1105,13 +1167,18 @@
         document.getElementById('setupButton').addEventListener('click', handleSetup);
         document.getElementById('healthButton').addEventListener('click', handleHealthCheck);
         document.getElementById('refreshButton').addEventListener('click', loadData);
+        document.getElementById('showAddCardButton').addEventListener('click', openAddCardForm);
         document.getElementById('resetCardButton').addEventListener('click', resetCardForm);
+        document.getElementById('settingsForm').addEventListener('submit', handleSettingsSubmit);
+        document.getElementById('resetSettingsButton').addEventListener('click', resetSettingsForm);
+        document.getElementById('clearSettingsButton').addEventListener('click', clearSettingsOverrides);
         document.getElementById('cardForm').addEventListener('submit', handleCardSubmit);
         document.getElementById('transactionForm').addEventListener('submit', handleTransactionSubmit);
         document.getElementById('simulatorForm').addEventListener('submit', handleSimulatorSubmit);
       }
 
       function setDefaultFormValues() {
+        state.settingsOverrides = loadSettingsOverrides();
         document.getElementById('transactionDate').value = toInputDate(new Date());
         document.getElementById('transactionCategory').innerHTML = CATEGORIES.map(function(category) {
           return `<option value="${escapeHtml(category)}">${escapeHtml(category)}</option>`;
@@ -1239,7 +1306,7 @@
         setLoading(true, 'Loading project data...');
         try {
           const data = await callServer('getAppData');
-          state.data = data;
+          setServerData(data);
           renderApp();
         } catch (error) {
           showToast(error.message, true);
@@ -1252,7 +1319,7 @@
         setLoading(true, 'Creating sheets and seeding demo data...');
         try {
           const data = await callServer('runSetupAndCheck');
-          state.data = data;
+          setServerData(data);
           renderApp();
           showToast('Spreadsheet tables and demo data are ready.');
         } catch (error) {
@@ -1266,9 +1333,10 @@
         setLoading(true, 'Checking spreadsheet connection...');
         try {
           const systemStatus = await callServer('getSystemStatus');
-          state.data = state.data || {};
-          state.data.systemStatus = systemStatus;
-          renderSystemStatus(systemStatus);
+          state.baseData = state.baseData || {};
+          state.baseData.systemStatus = systemStatus;
+          state.data = cloneData(state.baseData);
+          renderApp();
           showToast(systemStatus.message || 'Connection check completed.');
         } catch (error) {
           showToast(error.message, true);
@@ -1284,7 +1352,7 @@
         setLoading(true, 'Saving card...');
         try {
           const data = await callServer('saveCard', payload);
-          state.data = data;
+          setServerData(data);
           renderApp();
           resetCardForm();
           showToast('Card saved successfully.');
@@ -1302,7 +1370,7 @@
         setLoading(true, 'Saving transaction...');
         try {
           const data = await callServer('addTransaction', payload);
-          state.data = data;
+          setServerData(data);
           renderApp();
           event.target.reset();
           document.getElementById('transactionDate').value = toInputDate(new Date());
@@ -1329,10 +1397,12 @@
       }
 
       function renderApp() {
+        state.data = cloneData(state.baseData || state.data || {});
+        applySettingsOverridesToData();
         const data = state.data || {};
         const needsSetup = !!data.needsSetup;
         document.getElementById('setupState').classList.toggle('hidden', !needsSetup);
-        document.getElementById('appState').classList.toggle('hidden', needsSetup);
+        document.getElementById('appState').classList.remove('hidden');
 
         const sheetLink = document.getElementById('sheetLink');
         if (data.spreadsheetUrl) {
@@ -1347,6 +1417,9 @@
           : 'Data ready. Spreadsheet tables are connected and the dashboard is live.';
 
         if (needsSetup) {
+          renderSettings();
+          renderSystemStatus(state.data.systemStatus);
+          setActiveView('settings');
           return;
         }
 
@@ -1388,6 +1461,9 @@
 
       function renderCards() {
         document.getElementById('cardsList').innerHTML = renderCardCollection(state.data.cards, true);
+        if (!document.getElementById('cardId').value) {
+          document.getElementById('cardFormPanel').classList.add('hidden');
+        }
       }
 
       function renderAddTransaction() {
@@ -1410,25 +1486,14 @@
       function renderSettings() {
         const settings = state.data.settings || {};
         const systemStatus = state.data.systemStatus || {};
-        const rows = [
-          { label: 'Project name', value: state.data.projectName || 'Cradit Tracking' },
-          { label: 'Currency', value: settings.currency || 'THB' },
-          { label: 'Utilization warning', value: (settings.warningUtilization || '50') + '%' },
-          { label: 'Utilization danger', value: (settings.dangerUtilization || '80') + '%' },
-          { label: 'Statement notice days', value: settings.statementNoticeDays || '7,3,1' },
-          { label: 'Payment notice days', value: settings.paymentNoticeDays || '7,3,1' },
-          { label: 'Spreadsheet connected', value: systemStatus.connected ? 'Yes' : 'No' },
-          { label: 'Generated at', value: state.data.generatedAt ? new Date(state.data.generatedAt).toLocaleString() : '-' },
-        ];
-
-        document.getElementById('settingsList').innerHTML = rows.map(function(item) {
-          return `
-            <div class="simple-item">
-              <strong>${escapeHtml(item.label)}</strong>
-              <div class="panel-subtext">${escapeHtml(String(item.value))}</div>
-            </div>
-          `;
-        }).join('');
+        document.getElementById('settingsProjectName').value = state.data.projectName || 'Cradit Tracking';
+        document.getElementById('settingsCurrency').value = settings.currency || 'THB';
+        document.getElementById('settingsWarningUtilization').value = settings.warningUtilization || '50';
+        document.getElementById('settingsDangerUtilization').value = settings.dangerUtilization || '80';
+        document.getElementById('settingsStatementNoticeDays').value = settings.statementNoticeDays || '7,3,1';
+        document.getElementById('settingsPaymentNoticeDays').value = settings.paymentNoticeDays || '7,3,1';
+        document.getElementById('settingsSpreadsheetConnected').textContent = systemStatus.connected ? 'Yes' : 'No';
+        document.getElementById('settingsGeneratedAt').textContent = state.data.generatedAt ? new Date(state.data.generatedAt).toLocaleString() : '-';
       }
 
       function renderSystemStatus(systemStatus) {
@@ -1650,6 +1715,7 @@
           return;
         }
 
+        document.getElementById('cardFormPanel').classList.remove('hidden');
         document.getElementById('cardFormTitle').textContent = 'Edit card';
         document.getElementById('cardId').value = card.id;
         document.getElementById('cardCreatedAt').value = card.createdAt || '';
@@ -1665,6 +1731,7 @@
       }
 
       function resetCardForm() {
+        document.getElementById('cardFormPanel').classList.add('hidden');
         document.getElementById('cardFormTitle').textContent = 'Add new card';
         document.getElementById('cardForm').reset();
         document.getElementById('cardId').value = '';
@@ -1675,10 +1742,92 @@
         document.getElementById('isActive').value = 'true';
       }
 
+      function openAddCardForm() {
+        document.getElementById('cardFormPanel').classList.remove('hidden');
+        document.getElementById('cardFormTitle').textContent = 'Add new card';
+        document.getElementById('cardForm').reset();
+        document.getElementById('cardId').value = '';
+        document.getElementById('cardCreatedAt').value = '';
+        document.getElementById('cardColor').value = '#a78bfa';
+        document.getElementById('statementDay').value = 12;
+        document.getElementById('paymentDueDay').value = 5;
+        document.getElementById('isActive').value = 'true';
+      }
+
+      function handleSettingsSubmit(event) {
+        event.preventDefault();
+        state.settingsOverrides = collectSettingsOverrides();
+        saveSettingsOverrides(state.settingsOverrides);
+        renderApp();
+        showToast('Settings saved in this browser.');
+      }
+
+      function resetSettingsForm() {
+        renderSettings();
+        showToast('Settings form reset to current saved values.');
+      }
+
+      function clearSettingsOverrides() {
+        window.localStorage.removeItem('craditTrackingSettings');
+        state.settingsOverrides = {};
+        renderApp();
+        showToast('Saved settings removed from this browser.');
+      }
+
+      function collectSettingsOverrides() {
+        return {
+          projectName: document.getElementById('settingsProjectName').value.trim(),
+          currency: document.getElementById('settingsCurrency').value.trim() || 'THB',
+          warningUtilization: document.getElementById('settingsWarningUtilization').value.trim() || '50',
+          dangerUtilization: document.getElementById('settingsDangerUtilization').value.trim() || '80',
+          statementNoticeDays: document.getElementById('settingsStatementNoticeDays').value.trim() || '7,3,1',
+          paymentNoticeDays: document.getElementById('settingsPaymentNoticeDays').value.trim() || '7,3,1',
+        };
+      }
+
+      function loadSettingsOverrides() {
+        try {
+          const raw = window.localStorage.getItem('craditTrackingSettings');
+          return raw ? JSON.parse(raw) : {};
+        } catch (error) {
+          return {};
+        }
+      }
+
+      function saveSettingsOverrides(overrides) {
+        window.localStorage.setItem('craditTrackingSettings', JSON.stringify(overrides));
+      }
+
+      function applySettingsOverridesToData() {
+        if (!state.data) {
+          return;
+        }
+
+        const overrides = state.settingsOverrides || {};
+        state.data.settings = Object.assign({}, state.data.settings || {}, {
+          currency: overrides.currency || (state.data.settings && state.data.settings.currency) || 'THB',
+          warningUtilization: overrides.warningUtilization || (state.data.settings && state.data.settings.warningUtilization) || '50',
+          dangerUtilization: overrides.dangerUtilization || (state.data.settings && state.data.settings.dangerUtilization) || '80',
+          statementNoticeDays: overrides.statementNoticeDays || (state.data.settings && state.data.settings.statementNoticeDays) || '7,3,1',
+          paymentNoticeDays: overrides.paymentNoticeDays || (state.data.settings && state.data.settings.paymentNoticeDays) || '7,3,1',
+        });
+        state.data.projectName = overrides.projectName || state.data.projectName || 'Cradit Tracking';
+      }
+
+      function setServerData(data) {
+        state.baseData = cloneData(data);
+        state.data = cloneData(data);
+      }
+
+      function cloneData(value) {
+        return JSON.parse(JSON.stringify(value || {}));
+      }
+
       function formatCurrency(value) {
+        const currency = (((state.data || {}).settings || {}).currency || 'THB').toUpperCase();
         return new Intl.NumberFormat('en-US', {
           style: 'currency',
-          currency: 'THB',
+          currency: currency,
           minimumFractionDigits: 0,
           maximumFractionDigits: 0,
         }).format(Number(value || 0));

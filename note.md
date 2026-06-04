@@ -89,3 +89,9 @@
 - ปัญหา: หลัง deploy backend ใหม่ หน้าเว็บจาก GitHub ยังชี้ไป URL เก่า
 - แก้อย่างไร: เปลี่ยนค่าคงที่ `APPS_SCRIPT_API_URL` ให้ตรงกับ deployment ล่าสุด
 - ทำต่อ: push ขึ้น GitHub แล้วทดสอบหน้าเว็บว่าคุยกับ backend URL ใหม่นี้ได้จริง
+
+## 2026-06-04 09:52:07
+- ทำอะไรไป: แก้ `index.html` อย่างเดียวตามคำสั่ง โดยย้ายปุ่ม `Open spreadsheet`, `Check connection`, `Refresh data`, `Setup sheets + demo data` ไปไว้เฉพาะหน้า `Settings`, ซ่อนฟอร์ม `Add new card` ไว้หลังปุ่ม `Add card` ที่อยู่ล่างสุดของรายการบัตร, และเปลี่ยน `Settings` ให้เป็นฟอร์มที่แก้ค่าได้จริงพร้อมบันทึกลง `localStorage` ของเบราว์เซอร์
+- ปัญหา: ถ้าย้ายปุ่ม setup ไปไว้หน้า `Settings` ตรง ๆ แต่ระบบยัง `needsSetup` อยู่ หน้าแอปจะถูกซ่อนทั้งหมดทำให้กด setup ไม่ได้ และถ้าทำ settings แบบแก้ได้โดยไม่แยกข้อมูลฐานออกจาก override การกด reset/clear จะย้อนค่าลำบาก
+- แก้อย่างไร: ปรับ `renderApp()` ให้ตอนยังไม่ setup พาไปหน้า `Settings` โดยยังแสดงกล่องเตือน setup อยู่, เพิ่ม `showAddCardButton` กับ `cardFormPanel` แบบ hidden/unhidden, และเพิ่มชั้น `baseData + settingsOverrides` เพื่อให้ settings ฝั่ง HTML จำค่า, reset ค่า, และลบค่าที่บันทึกไว้ได้โดยไม่แตะ `code.gs`
+- ทำต่อ: เปิดหน้าเว็บจาก GitHub/Apps Script แล้วเช็ก 4 จุดนี้จริงอีกครั้ง โดยเฉพาะการกด `Add card`, การบันทึก settings, และการเข้าหน้า `Settings` ตอนระบบยังไม่ setup
