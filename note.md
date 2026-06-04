@@ -95,3 +95,9 @@
 - ปัญหา: ถ้าย้ายปุ่ม setup ไปไว้หน้า `Settings` ตรง ๆ แต่ระบบยัง `needsSetup` อยู่ หน้าแอปจะถูกซ่อนทั้งหมดทำให้กด setup ไม่ได้ และถ้าทำ settings แบบแก้ได้โดยไม่แยกข้อมูลฐานออกจาก override การกด reset/clear จะย้อนค่าลำบาก
 - แก้อย่างไร: ปรับ `renderApp()` ให้ตอนยังไม่ setup พาไปหน้า `Settings` โดยยังแสดงกล่องเตือน setup อยู่, เพิ่ม `showAddCardButton` กับ `cardFormPanel` แบบ hidden/unhidden, และเพิ่มชั้น `baseData + settingsOverrides` เพื่อให้ settings ฝั่ง HTML จำค่า, reset ค่า, และลบค่าที่บันทึกไว้ได้โดยไม่แตะ `code.gs`
 - ทำต่อ: เปิดหน้าเว็บจาก GitHub/Apps Script แล้วเช็ก 4 จุดนี้จริงอีกครั้ง โดยเฉพาะการกด `Add card`, การบันทึก settings, และการเข้าหน้า `Settings` ตอนระบบยังไม่ setup
+
+## 2026-06-04 10:20:32
+- ทำอะไรไป: สร้างไฟล์ไอคอนแอปใหม่ `favicon-32x32.png`, `icon-192.png`, `icon-512.png`, `apple-touch-icon.png` โดยอิงภาพบัตรเครดิตที่ผู้ใช้ส่ง และอัปเดต `index.html` ให้ใส่ `theme-color`, `mobile-web-app-capable`, `apple-mobile-web-app-capable`, `apple-mobile-web-app-title`, `apple-mobile-web-app-status-bar-style` พร้อมลิงก์ไปยังไฟล์ไอคอนเหล่านี้
+- ปัญหา: ถ้ามีแค่ favicon ธรรมดา iPhone ตอน `Add to Home Screen` อาจไม่ใช้ไอคอนที่ต้องการ และรอบแรกเจอปัญหาเซฟไฟล์ภาพด้วย absolute path ภาษาไทยบน Windows ไม่ผ่าน
+- แก้อย่างไร: ใช้ path แบบ relative ภายในโฟลเดอร์โปรเจ็กต์เพื่อสร้างไฟล์ภาพให้ปลอดภัยบน Windows และใส่ `apple-touch-icon` แยกเฉพาะสำหรับ iPhone shortcut/home screen
+- ทำต่อ: เปิดเว็บจาก Safari บน iPhone แล้วกด `Add to Home Screen` เพื่อตรวจว่าไอคอนขึ้นตามไฟล์ `apple-touch-icon.png` ที่เพิ่มไว้
