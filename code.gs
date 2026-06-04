@@ -1,6 +1,8 @@
 const PROJECT_NAME = 'Cradit Tracking';
 const SPREADSHEET_PROPERTY_KEY = 'CRADIT_TRACKING_SPREADSHEET_ID';
 const APP_TIMEZONE = Session.getScriptTimeZone() || 'Asia/Bangkok';
+const TARGET_SPREADSHEET_ID = '1YRQ5REs_u26LOND6g7ez2FYM1D57gqg8I84ah0oIT2g';
+const TARGET_SPREADSHEET_URL = 'https://docs.google.com/spreadsheets/d/1YRQ5REs_u26LOND6g7ez2FYM1D57gqg8I84ah0oIT2g/edit?gid=0#gid=0';
 
 const SHEET_DEFINITIONS = {
   Cards: ['id', 'cardName', 'bankName', 'creditLimit', 'statementDay', 'paymentDueDay', 'cardColor', 'cardType', 'notes', 'isActive', 'createdAt', 'updatedAt'],
@@ -188,33 +190,28 @@ function runSetupCore_() {
 }
 
 function getOrCreateProjectSpreadsheet_() {
-  const properties = PropertiesService.getScriptProperties();
-  const spreadsheetId = properties.getProperty(SPREADSHEET_PROPERTY_KEY);
-
-  if (spreadsheetId) {
-    try {
-      return SpreadsheetApp.openById(spreadsheetId);
-    } catch (error) {
-      properties.deleteProperty(SPREADSHEET_PROPERTY_KEY);
-    }
-  }
-
-  const spreadsheet = SpreadsheetApp.create(PROJECT_NAME + ' Data');
-  properties.setProperty(SPREADSHEET_PROPERTY_KEY, spreadsheet.getId());
-  return spreadsheet;
+  return openTargetSpreadsheet_();
 }
 
 function openProjectSpreadsheet_() {
-  const spreadsheetId = PropertiesService.getScriptProperties().getProperty(SPREADSHEET_PROPERTY_KEY);
-  if (!spreadsheetId) {
+  try {
+    return openTargetSpreadsheet_();
+  } catch (error) {
     return null;
+  }
+}
+
+function openTargetSpreadsheet_() {
+  if (!TARGET_SPREADSHEET_ID) {
+    throw new Error('TARGET_SPREADSHEET_ID is empty.');
   }
 
   try {
-    return SpreadsheetApp.openById(spreadsheetId);
+    const spreadsheet = SpreadsheetApp.openById(TARGET_SPREADSHEET_ID);
+    PropertiesService.getScriptProperties().setProperty(SPREADSHEET_PROPERTY_KEY, TARGET_SPREADSHEET_ID);
+    return spreadsheet;
   } catch (error) {
-    PropertiesService.getScriptProperties().deleteProperty(SPREADSHEET_PROPERTY_KEY);
-    return null;
+    throw new Error('Cannot open target spreadsheet: ' + TARGET_SPREADSHEET_URL);
   }
 }
 
@@ -775,7 +772,7 @@ function buildSystemStatus_(spreadsheet) {
       spreadsheetId: '',
       spreadsheetUrl: '',
       spreadsheetName: '',
-      message: 'No project spreadsheet connected yet. Run setupProject first.',
+      message: 'Target spreadsheet is not connected yet. Run setupProject first.',
       sheetStatus: Object.keys(SHEET_DEFINITIONS).map(function(name) {
         return { name: name, exists: false, rowCount: 0, hasHeaders: false };
       }),
@@ -806,7 +803,7 @@ function buildSystemStatus_(spreadsheet) {
     spreadsheetId: spreadsheet.getId(),
     spreadsheetUrl: spreadsheet.getUrl(),
     spreadsheetName: spreadsheet.getName(),
-    message: missingSheets.length ? 'Some sheets are missing.' : 'Spreadsheet connection is healthy.',
+    message: missingSheets.length ? 'Target spreadsheet is connected but some sheets are missing.' : 'Target spreadsheet connection is healthy.',
     sheetStatus: sheetStatus,
     missingSheets: missingSheets,
   };

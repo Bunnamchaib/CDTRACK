@@ -77,3 +77,9 @@
 - ปัญหา: หลัง redeploy แล้วหน้า GitHub ยังชี้ไป URL เก่า จึงต้องเปลี่ยนให้ frontend เรียก backend ตัวใหม่
 - แก้อย่างไร: แก้ค่าคงที่ `APPS_SCRIPT_API_URL` ใน `index.html` ให้ใช้ URL deploy ล่าสุด
 - ทำต่อ: push ขึ้น GitHub แล้วทดสอบหน้าเว็บจาก GitHub Pages ว่ายิงไป backend ใหม่ได้จริง
+
+## 2026-06-04 08:48:56
+- ทำอะไรไป: แก้ `code.gs` ให้เขียนลง Google Sheet เป้าหมายโดยตรงที่ `1YRQ5REs_u26LOND6g7ez2FYM1D57gqg8I84ah0oIT2g` แทนการสร้าง spreadsheet ใหม่, เพิ่ม `TARGET_SPREADSHEET_ID` และ `TARGET_SPREADSHEET_URL`, และเปลี่ยน flow เปิดชีตให้ใช้ `openTargetSpreadsheet_()`
+- ปัญหา: logic เดิมของ setup ใช้ `SpreadsheetApp.create(...)` ทำให้สร้างชีตข้อมูลใหม่ทุกครั้งที่ไม่เจอ property แทนที่จะเขียนลงชีตที่ผู้ใช้ต้องการ
+- แก้อย่างไร: ล็อก backend ให้เปิด spreadsheet เป้าหมายใบเดียวเสมอ และถ้าเปิดไม่ได้ให้ throw error ชัด ๆ แทนการ fallback ไปสร้างไฟล์ใหม่
+- ทำต่อ: ต้อง redeploy Apps Script อีก 1 รอบ เพราะ `code.gs` เปลี่ยน แล้วจึงค่อยรัน `setupProject` เพื่อสร้างแท็บและข้อมูลดัมมี่ลงในชีตเป้าหมายใบนี้
