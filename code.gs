@@ -11,10 +11,18 @@ const SHEET_DEFINITIONS = {
   Settings: ['key', 'value', 'description'],
 };
 
-function doGet() {
+function doGet(e) {
+  if (isApiRequest_(e)) {
+    return handleApiRequest_(e);
+  }
+
   return HtmlService.createHtmlOutputFromFile('index')
     .setTitle(PROJECT_NAME)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+}
+
+function doPost(e) {
+  return handleApiRequest_(e);
 }
 
 function setupProject() {
@@ -1042,4 +1050,86 @@ function errorMessage_(error) {
     return error.message;
   }
   return String(error);
+}
+
+function isApiRequest_(e) {
+  return !!(e && e.parameter && e.parameter.action);
+}
+
+function handleApiRequest_(e) {
+  try {
+    const action = sanitizeText_(e && e.parameter ? e.parameter.action : '');
+    const payload = readPayload_(e);
+    const data = runAction_(action, payload);
+    return buildApiResponse_(e, {
+      ok: true,
+      action: action,
+      data: data,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    return buildApiResponse_(e, {
+      ok: false,
+      message: errorMessage_(error),
+      timestamp: new Date().toISOString(),
+    });
+  }
+}
+
+function runAction_(action, payload) {
+  switch (action) {
+    case 'setupProject':
+      return setupProject();
+    case 'runSetupAndCheck':
+      return runSetupAndCheck();
+    case 'getAppData':
+      return getAppData();
+    case 'getSystemStatus':
+      return getSystemStatus();
+    case 'saveCard':
+      return saveCard(payload);
+    case 'addTransaction':
+      return addTransaction(payload);
+    case 'simulatePurchase':
+      return simulatePurchase(payload.amount || payload);
+    default:
+      throw new Error('Unknown action: ' + action);
+  }
+}
+
+function readPayload_(e) {
+  const payloadText = sanitizeText_(e && e.parameter ? e.parameter.payload : '');
+  if (!payloadText) {
+    return {};
+  }
+
+  try {
+    return JSON.parse(payloadText);
+  } catch (error) {
+    throw new Error('Invalid payload JSON.');
+  }
+}
+
+function buildApiResponse_(e, response) {
+  const callback = sanitizeCallback_(e && e.parameter ? e.parameter.callback : '');
+  const text = JSON.stringify(response);
+
+  if (callback) {
+    return ContentService
+      .createTextOutput(callback + '(' + text + ');')
+      .setMimeType(ContentService.MimeType.JAVASCRIPT);
+  }
+
+  return ContentService
+    .createTextOutput(text)
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function sanitizeCallback_(value) {
+  const text = sanitizeText_(value);
+  if (!text) {
+    return '';
+  }
+
+  return /^[A-Za-z0-9_.$]+$/.test(text) ? text : '';
 }

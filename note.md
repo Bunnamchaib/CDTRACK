@@ -65,3 +65,9 @@
 - ปัญหา: setup มีโอกาสพังเองจากการ log/serialize object ภายใน Apps Script แม้ขั้นสร้าง spreadsheet กับชีตจะทำงานได้ ทำให้ผู้ใช้เห็นเหมือนฟังก์ชัน setup ใช้งานไม่ได้
 - แก้อย่างไร: log เฉพาะข้อมูล plain object, ห่อ `try/catch` ใน `setupProject`, `runSetupAndCheck`, `getAppData`, `saveCard`, `addTransaction`, `simulatePurchase`, และใช้ `errorMessage_()` รวมข้อความ error ให้แคบและชัด
 - ทำต่อ: อัปเดต `code.gs` เวอร์ชันนี้ขึ้น Apps Script แล้วรัน `setupProject` ใหม่ก่อน ถ้ายังผิดให้ดูข้อความ error ใหม่ที่ควรชัดขึ้นกว่าเดิมมาก
+
+## 2026-06-04 08:17:02
+- ทำอะไรไป: ปรับระบบให้หน้าเว็บรันผ่าน GitHub Pages ได้โดยใส่ Apps Script backend URL `https://script.google.com/macros/s/AKfycbyKPJDQUPM3a56YmqeFb7RFxRXNIMY-UO7HkEegayuY_pJji0S2NC02ZChr137u9a5b_Q/exec` ลงใน `index.html`, เปลี่ยน `callServer()` ให้ fallback ไปเรียก backend แบบ JSONP เมื่อไม่มี `google.script.run`, และเพิ่ม API router ใน `code.gs` ผ่าน `doGet(e)`/`doPost(e)` ที่รองรับ `action`
+- ปัญหา: ถ้ารันหน้าเว็บจาก GitHub Pages ตรง ๆ จะใช้ `google.script.run` ไม่ได้ ทำให้ frontend เดิมไม่สามารถคุยกับ `.gs` backend ได้
+- แก้อย่างไร: ให้ frontend เลือก 2 โหมดอัตโนมัติ คือ Apps Script runtime เดิมเมื่อเปิดผ่าน GAS และ JSONP API mode เมื่อเปิดผ่าน GitHub Pages พร้อมส่ง `action` และ `payload` ไปยัง backend URL ที่กำหนด
+- ทำต่อ: ต้องเอา `code.gs` เวอร์ชันนี้ขึ้น Apps Script แล้ว redeploy URL เดิมให้ใช้โค้ดล่าสุด จากนั้นหน้าเว็บบน GitHub จะเรียก backend นี้ได้จริง

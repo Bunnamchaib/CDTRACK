@@ -1012,6 +1012,7 @@
     </div>
 
     <script>
+      const APPS_SCRIPT_API_URL = 'https://script.google.com/macros/s/AKfycbyKPJDQUPM3a56YmqeFb7RFxRXNIMY-UO7HkEegayuY_pJji0S2NC02ZChr137u9a5b_Q/exec';
       const NAV_ITEMS = [
         { id: 'dashboard', label: 'Dashboard', icon: 'dashboard' },
         { id: 'cards', label: 'Cards', icon: 'credit_card' },
@@ -1161,12 +1162,15 @@
       }
 
       function callServer(functionName, payload) {
-        return new Promise(function(resolve, reject) {
-          if (!(window.google && google.script && google.script.run)) {
-            reject(new Error('Open this file as a Google Apps Script web app to use server features.'));
-            return;
-          }
+        if (window.google && google.script && google.script.run) {
+          return callAppsScriptRuntime_(functionName, payload);
+        }
 
+        return callAppsScriptJsonp_(functionName, payload);
+      }
+
+      function callAppsScriptRuntime_(functionName, payload) {
+        return new Promise(function(resolve, reject) {
           const runner = google.script.run
             .withSuccessHandler(resolve)
             .withFailureHandler(function(error) {
@@ -1178,6 +1182,56 @@
           } else {
             runner[functionName](payload);
           }
+        });
+      }
+
+      function callAppsScriptJsonp_(functionName, payload) {
+        return new Promise(function(resolve, reject) {
+          const callbackName = '__appsScriptCallback_' + Date.now() + '_' + Math.floor(Math.random() * 100000);
+          const script = document.createElement('script');
+          const params = new URLSearchParams();
+          const timer = window.setTimeout(function() {
+            cleanup();
+            reject(new Error('Apps Script API request timed out.'));
+          }, 20000);
+
+          function cleanup() {
+            window.clearTimeout(timer);
+            if (script.parentNode) {
+              script.parentNode.removeChild(script);
+            }
+            try {
+              delete window[callbackName];
+            } catch (error) {
+              window[callbackName] = undefined;
+            }
+          }
+
+          window[callbackName] = function(response) {
+            cleanup();
+
+            if (!response || response.ok !== true) {
+              reject(new Error(response && response.message ? response.message : 'Apps Script API request failed.'));
+              return;
+            }
+
+            resolve(response.data);
+          };
+
+          params.set('action', functionName);
+          params.set('callback', callbackName);
+
+          if (typeof payload !== 'undefined') {
+            params.set('payload', JSON.stringify(payload));
+          }
+
+          script.async = true;
+          script.src = APPS_SCRIPT_API_URL + '?' + params.toString();
+          script.onerror = function() {
+            cleanup();
+            reject(new Error('Failed to reach the Apps Script API URL.'));
+          };
+          document.body.appendChild(script);
         });
       }
 
