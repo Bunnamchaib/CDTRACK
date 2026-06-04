@@ -83,3 +83,9 @@
 - ปัญหา: logic เดิมของ setup ใช้ `SpreadsheetApp.create(...)` ทำให้สร้างชีตข้อมูลใหม่ทุกครั้งที่ไม่เจอ property แทนที่จะเขียนลงชีตที่ผู้ใช้ต้องการ
 - แก้อย่างไร: ล็อก backend ให้เปิด spreadsheet เป้าหมายใบเดียวเสมอ และถ้าเปิดไม่ได้ให้ throw error ชัด ๆ แทนการ fallback ไปสร้างไฟล์ใหม่
 - ทำต่อ: ต้อง redeploy Apps Script อีก 1 รอบ เพราะ `code.gs` เปลี่ยน แล้วจึงค่อยรัน `setupProject` เพื่อสร้างแท็บและข้อมูลดัมมี่ลงในชีตเป้าหมายใบนี้
+
+## 2026-06-04 09:04:09
+- ทำอะไรไป: อัปเดต Apps Script backend URL ใน `index.html` เป็น `https://script.google.com/macros/s/AKfycbwgmCw5FQAJ4jX-1c5tp6zxqEq6Taa9baheHgD-sfoKSR1Y2gbxUmkbRHlM0Kbjyj-eBg/exec`
+- ปัญหา: หลัง deploy backend ใหม่ หน้าเว็บจาก GitHub ยังชี้ไป URL เก่า
+- แก้อย่างไร: เปลี่ยนค่าคงที่ `APPS_SCRIPT_API_URL` ให้ตรงกับ deployment ล่าสุด
+- ทำต่อ: push ขึ้น GitHub แล้วทดสอบหน้าเว็บว่าคุยกับ backend URL ใหม่นี้ได้จริง
