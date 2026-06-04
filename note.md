@@ -71,3 +71,9 @@
 - ปัญหา: ถ้ารันหน้าเว็บจาก GitHub Pages ตรง ๆ จะใช้ `google.script.run` ไม่ได้ ทำให้ frontend เดิมไม่สามารถคุยกับ `.gs` backend ได้
 - แก้อย่างไร: ให้ frontend เลือก 2 โหมดอัตโนมัติ คือ Apps Script runtime เดิมเมื่อเปิดผ่าน GAS และ JSONP API mode เมื่อเปิดผ่าน GitHub Pages พร้อมส่ง `action` และ `payload` ไปยัง backend URL ที่กำหนด
 - ทำต่อ: ต้องเอา `code.gs` เวอร์ชันนี้ขึ้น Apps Script แล้ว redeploy URL เดิมให้ใช้โค้ดล่าสุด จากนั้นหน้าเว็บบน GitHub จะเรียก backend นี้ได้จริง
+
+## 2026-06-04 08:21:18
+- ทำอะไรไป: อัปเดต Apps Script backend URL ใน `index.html` จาก deploy เดิมเป็น `https://script.google.com/macros/s/AKfycbxGsJnvko3x-oRi3Mky1Gz2Tz-jB8wbpYvJ3WAyZwboSLsxWQA9juzreSi7Fnnw2Eky/exec`
+- ปัญหา: หลัง redeploy แล้วหน้า GitHub ยังชี้ไป URL เก่า จึงต้องเปลี่ยนให้ frontend เรียก backend ตัวใหม่
+- แก้อย่างไร: แก้ค่าคงที่ `APPS_SCRIPT_API_URL` ใน `index.html` ให้ใช้ URL deploy ล่าสุด
+- ทำต่อ: push ขึ้น GitHub แล้วทดสอบหน้าเว็บจาก GitHub Pages ว่ายิงไป backend ใหม่ได้จริง
