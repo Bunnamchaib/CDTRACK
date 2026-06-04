@@ -18,105 +18,146 @@ function doGet() {
 }
 
 function setupProject() {
-  const result = runSetupCore_();
-  Logger.log(JSON.stringify(result));
-  return 'Setup complete. Spreadsheet URL: ' + result.spreadsheetUrl;
+  try {
+    const result = runSetupCore_();
+    const logPayload = {
+      ok: result.ok,
+      steps: result.steps,
+      spreadsheetId: result.spreadsheetId,
+      spreadsheetUrl: result.spreadsheetUrl,
+    };
+    Logger.log(JSON.stringify(logPayload));
+    return {
+      ok: true,
+      message: 'Setup complete.',
+      spreadsheetId: result.spreadsheetId,
+      spreadsheetUrl: result.spreadsheetUrl,
+      steps: result.steps,
+      systemStatus: buildSystemStatus_(result.spreadsheet),
+    };
+  } catch (error) {
+    throw new Error('setupProject failed: ' + errorMessage_(error));
+  }
 }
 
 function runSetupAndCheck() {
-  const result = runSetupCore_();
-  const payload = buildAppState_(result.spreadsheet);
-  payload.setupCompletedAt = new Date().toISOString();
-  payload.setupSteps = result.steps;
-  return payload;
+  try {
+    const result = runSetupCore_();
+    const payload = buildAppState_(result.spreadsheet);
+    payload.setupCompletedAt = new Date().toISOString();
+    payload.setupSteps = result.steps;
+    return payload;
+  } catch (error) {
+    throw new Error('runSetupAndCheck failed: ' + errorMessage_(error));
+  }
 }
 
 function getAppData() {
-  const spreadsheet = openProjectSpreadsheet_();
-  if (!spreadsheet) {
-    return emptyAppState_();
-  }
+  try {
+    const spreadsheet = openProjectSpreadsheet_();
+    if (!spreadsheet) {
+      return emptyAppState_();
+    }
 
-  ensureAllSheets_(spreadsheet);
-  ensureSeedData_(spreadsheet);
-  return buildAppState_(spreadsheet);
+    ensureAllSheets_(spreadsheet);
+    ensureSeedData_(spreadsheet);
+    return buildAppState_(spreadsheet);
+  } catch (error) {
+    throw new Error('getAppData failed: ' + errorMessage_(error));
+  }
 }
 
 function getSystemStatus() {
-  return buildSystemStatus_(openProjectSpreadsheet_());
+  try {
+    return buildSystemStatus_(openProjectSpreadsheet_());
+  } catch (error) {
+    throw new Error('getSystemStatus failed: ' + errorMessage_(error));
+  }
 }
 
 function saveCard(cardInput) {
-  const spreadsheet = getRequiredSpreadsheet_();
-  ensureAllSheets_(spreadsheet);
+  try {
+    const spreadsheet = getRequiredSpreadsheet_();
+    ensureAllSheets_(spreadsheet);
 
-  const now = new Date().toISOString();
-  const card = {
-    id: sanitizeText_(cardInput.id) || createId_('CARD'),
-    cardName: sanitizeText_(cardInput.cardName),
-    bankName: sanitizeText_(cardInput.bankName),
-    creditLimit: parseNumber_(cardInput.creditLimit),
-    statementDay: normalizeDay_(cardInput.statementDay),
-    paymentDueDay: normalizeDay_(cardInput.paymentDueDay),
-    cardColor: sanitizeText_(cardInput.cardColor) || '#a78bfa',
-    cardType: sanitizeText_(cardInput.cardType) || 'General',
-    notes: sanitizeText_(cardInput.notes),
-    isActive: normalizeBoolean_(cardInput.isActive),
-    createdAt: sanitizeText_(cardInput.createdAt) || now,
-    updatedAt: now,
-  };
+    const now = new Date().toISOString();
+    const card = {
+      id: sanitizeText_(cardInput.id) || createId_('CARD'),
+      cardName: sanitizeText_(cardInput.cardName),
+      bankName: sanitizeText_(cardInput.bankName),
+      creditLimit: parseNumber_(cardInput.creditLimit),
+      statementDay: normalizeDay_(cardInput.statementDay),
+      paymentDueDay: normalizeDay_(cardInput.paymentDueDay),
+      cardColor: sanitizeText_(cardInput.cardColor) || '#a78bfa',
+      cardType: sanitizeText_(cardInput.cardType) || 'General',
+      notes: sanitizeText_(cardInput.notes),
+      isActive: normalizeBoolean_(cardInput.isActive),
+      createdAt: sanitizeText_(cardInput.createdAt) || now,
+      updatedAt: now,
+    };
 
-  if (!card.cardName) {
-    throw new Error('Card name is required.');
-  }
-  if (!card.bankName) {
-    throw new Error('Bank name is required.');
-  }
-  if (card.creditLimit <= 0) {
-    throw new Error('Credit limit must be greater than 0.');
-  }
+    if (!card.cardName) {
+      throw new Error('Card name is required.');
+    }
+    if (!card.bankName) {
+      throw new Error('Bank name is required.');
+    }
+    if (card.creditLimit <= 0) {
+      throw new Error('Credit limit must be greater than 0.');
+    }
 
-  upsertObjectById_(spreadsheet.getSheetByName('Cards'), card);
-  syncAlertsForSpreadsheet_(spreadsheet);
-  return buildAppState_(spreadsheet);
+    upsertObjectById_(spreadsheet.getSheetByName('Cards'), card);
+    syncAlertsForSpreadsheet_(spreadsheet);
+    return buildAppState_(spreadsheet);
+  } catch (error) {
+    throw new Error('saveCard failed: ' + errorMessage_(error));
+  }
 }
 
 function addTransaction(transactionInput) {
-  const spreadsheet = getRequiredSpreadsheet_();
-  ensureAllSheets_(spreadsheet);
+  try {
+    const spreadsheet = getRequiredSpreadsheet_();
+    ensureAllSheets_(spreadsheet);
 
-  const transaction = {
-    id: createId_('TXN'),
-    cardId: sanitizeText_(transactionInput.cardId),
-    date: normalizeDateText_(transactionInput.date) || formatDateKey_(new Date()),
-    amount: parseNumber_(transactionInput.amount),
-    merchant: sanitizeText_(transactionInput.merchant),
-    category: sanitizeText_(transactionInput.category) || 'Others',
-    notes: sanitizeText_(transactionInput.notes),
-    receiptImageUrl: '',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
+    const transaction = {
+      id: createId_('TXN'),
+      cardId: sanitizeText_(transactionInput.cardId),
+      date: normalizeDateText_(transactionInput.date) || formatDateKey_(new Date()),
+      amount: parseNumber_(transactionInput.amount),
+      merchant: sanitizeText_(transactionInput.merchant),
+      category: sanitizeText_(transactionInput.category) || 'Others',
+      notes: sanitizeText_(transactionInput.notes),
+      receiptImageUrl: '',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
 
-  if (!transaction.cardId) {
-    throw new Error('Please choose a credit card.');
-  }
-  if (transaction.amount <= 0) {
-    throw new Error('Amount must be greater than 0.');
-  }
-  if (!transaction.merchant) {
-    throw new Error('Merchant is required.');
-  }
+    if (!transaction.cardId) {
+      throw new Error('Please choose a credit card.');
+    }
+    if (transaction.amount <= 0) {
+      throw new Error('Amount must be greater than 0.');
+    }
+    if (!transaction.merchant) {
+      throw new Error('Merchant is required.');
+    }
 
-  appendObjectRow_(spreadsheet.getSheetByName('Transactions'), transaction);
-  syncAlertsForSpreadsheet_(spreadsheet);
-  return buildAppState_(spreadsheet);
+    appendObjectRow_(spreadsheet.getSheetByName('Transactions'), transaction);
+    syncAlertsForSpreadsheet_(spreadsheet);
+    return buildAppState_(spreadsheet);
+  } catch (error) {
+    throw new Error('addTransaction failed: ' + errorMessage_(error));
+  }
 }
 
 function simulatePurchase(amountInput) {
-  const spreadsheet = getRequiredSpreadsheet_();
-  const state = buildAppState_(spreadsheet);
-  return buildSimulator_(state.cards, parseNumber_(amountInput));
+  try {
+    const spreadsheet = getRequiredSpreadsheet_();
+    const state = buildAppState_(spreadsheet);
+    return buildSimulator_(state.cards, parseNumber_(amountInput));
+  } catch (error) {
+    throw new Error('simulatePurchase failed: ' + errorMessage_(error));
+  }
 }
 
 function runSetupCore_() {
@@ -991,4 +1032,14 @@ function toSortedSeries_(map, labelResolver) {
 
 function sortByDateDesc_(a, b) {
   return toDate_(b.date).getTime() - toDate_(a.date).getTime();
+}
+
+function errorMessage_(error) {
+  if (!error) {
+    return 'Unknown error';
+  }
+  if (error.message) {
+    return error.message;
+  }
+  return String(error);
 }

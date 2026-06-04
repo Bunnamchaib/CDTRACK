@@ -59,3 +59,9 @@
 - ปัญหา: ฟังก์ชัน setup เดิมถูกแก้หลายรอบจนมีความเสี่ยงจาก logic แทรกเยอะเกินไป ทำให้จับต้นตอการสร้างชีต/ข้อมูลดัมมี่ไม่ชัดและแก้ยาก
 - แก้อย่างไร: เริ่มใหม่ด้วยเส้นทาง setup ที่ตรงที่สุดคือ `getOrCreateProjectSpreadsheet_ -> ensureAllSheets_ -> ensureSeedData_ -> syncAlerts`, และให้ `setupProject()` คืนค่าเป็นข้อความสั้น ๆ สำหรับการรันจาก editor ส่วนหน้าเว็บใช้ `runSetupAndCheck()` แยกต่างหาก
 - ทำต่อ: เอา `code.gs` ล่าสุดนี้ขึ้น Apps Script แล้วรัน `setupProject` ทันที ถ้าผ่านจะได้ spreadsheet/ตาราง/ข้อมูลดัมมี่ก่อน จากนั้นค่อยทดสอบหน้า Web App
+
+## 2026-06-04 08:08:22
+- ทำอะไรไป: แก้ `code.gs` รอบล่าสุดโดยตัดการ `JSON.stringify` object ที่มี `Spreadsheet` อยู่ภายในออกจาก `setupProject()`, เพิ่ม error wrapper ให้ฟังก์ชันหลักคืนข้อความชัดขึ้น, และให้ `setupProject()` คืน object ธรรมดาที่ serialize ได้จริง
+- ปัญหา: setup มีโอกาสพังเองจากการ log/serialize object ภายใน Apps Script แม้ขั้นสร้าง spreadsheet กับชีตจะทำงานได้ ทำให้ผู้ใช้เห็นเหมือนฟังก์ชัน setup ใช้งานไม่ได้
+- แก้อย่างไร: log เฉพาะข้อมูล plain object, ห่อ `try/catch` ใน `setupProject`, `runSetupAndCheck`, `getAppData`, `saveCard`, `addTransaction`, `simulatePurchase`, และใช้ `errorMessage_()` รวมข้อความ error ให้แคบและชัด
+- ทำต่อ: อัปเดต `code.gs` เวอร์ชันนี้ขึ้น Apps Script แล้วรัน `setupProject` ใหม่ก่อน ถ้ายังผิดให้ดูข้อความ error ใหม่ที่ควรชัดขึ้นกว่าเดิมมาก
